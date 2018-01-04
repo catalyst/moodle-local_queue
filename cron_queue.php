@@ -28,8 +28,15 @@ require(dirname(dirname(dirname(__FILE__))).'/config.php');
 require_once($CFG->dirroot.'/local/queue/classes/QueueManager.php');
 require_once($CFG->dirroot.'/local/queue/classes/queues/CronDatabaseQueue.php');
 
+$time = time();
+// Requeue orphan items from the previous run of the manager (if the process got terminated).
+local_queue_requeue_orphans($time);
+$unlink = !local_queue_defaults('keeplogs');
+if ($unlink) {
+    // If not keeping logs, remove the logs folder and all the contents (from previous orphans).
+    local_queue_rm_local_dir('logs');
+}
 $manager = new QueueManager(new queues\CronDatabaseQueue());
-// $manager->work();
-while(true){
-	$manager->standby();
+while (true) {
+    $manager->work();
 }

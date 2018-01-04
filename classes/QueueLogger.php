@@ -27,9 +27,14 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot.'/local/queue/lib.php');
 
 class QueueLogger {
+    const GREEN = "\033[32m";
+    const BLUE = "\033[34m";
+    const YELLOW = "\033[33m";
+    const PURPLE = "\033[35m";
+    const BLACK = "\033[0m";
 
-    public static function systemlog($message, $color = "\033[0m") {
-        $ce = "\033[0m \n";
+    public static function systemlog($message, $color = self::BLACK) {
+        $ce = self::BLACK;
         if (local_queue_defaults('mechanics')) {
             if (defined('STDOUT')) {
                 if (posix_isatty(STDOUT)) {
@@ -44,10 +49,9 @@ class QueueLogger {
     }
 
     public static function log($message) {
-            if (defined('STDOUT')) {
-                fwrite(STDOUT, $message.PHP_EOL);
-            }
-        // echo $message.PHP_EOL;
+        if (defined('STDOUT')) {
+            fwrite(STDOUT, $message.PHP_EOL);
+        }
     }
 
     public static function error($message) {
@@ -55,11 +59,11 @@ class QueueLogger {
         throw new \Exception($message);
     }
 
-    public static function read($filename) {
+    public static function read($filename, $hash = '') {
         $unlink = !local_queue_defaults('keeplogs');
         if ($outputpipe = fopen($filename, 'r')) {
             while (!feof($outputpipe)) {
-                $output = fread($outputpipe, 1024);
+                $output = $hash. ' '.fgets($outputpipe);
                 if (defined('STDOUT') and !PHPUNIT_TEST) {
                     fwrite(STDOUT, $output);
                 } else {

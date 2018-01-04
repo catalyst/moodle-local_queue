@@ -88,7 +88,8 @@ class edit_queue_cron_task_form extends \moodleform {
         $priorities[10] = $priorities[10].' - '. get_string('lowest', $localqueue);
         $mform->addElement('select', 'priority', get_string('priority', $localqueue), $priorities);
 
-        $mform->addElement('text', 'attempts', get_string('attempts', $localqueue));
+        $attributes = ['maxlength' => 5, 'size' => 5];
+        $mform->addElement('text', 'attempts', get_string('attempts', $localqueue), $attributes);
         $mform->setType('attempts', PARAM_RAW);
 
         $mform->addElement('hidden', 'task', $task['id']);

@@ -71,6 +71,6 @@ class cron_queue_refresher extends \core\task\scheduled_task {
             local_queue_item_prepare($record);
             unset($records[$key]);
         }
-        echo " $found Queue item(s) refreshed. \n";
+        echo " $found Queue item(s) refreshed. ";
     }
 }

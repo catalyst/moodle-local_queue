@@ -49,15 +49,17 @@ if ($hassiteconfig) {
         0
     ));
 
-    // Nice processes ?
-    $usenice = get_string('usenice', $localqueue);
-    $usenicehelp = get_string('usenice_help', $localqueue);
-    $settings->add(new admin_setting_configcheckbox(
-        'local_queue/local_queue_usenice',
-        $usenice,
-        $usenicehelp,
-        1
-    ));
+    if (PHP_OS == "Linux") {
+        // Nice processes ?
+        $usenice = get_string('usenice', $localqueue);
+        $usenicehelp = get_string('usenice_help', $localqueue);
+        $settings->add(new admin_setting_configcheckbox(
+            'local_queue/local_queue_usenice',
+            $usenice,
+            $usenicehelp,
+            1
+        ));
+    }
 
     // Number of worker pipes.
     $pipesnumber = get_string('pipesnumber', $localqueue);

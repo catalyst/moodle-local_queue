@@ -27,7 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 $tasks = array(
     array(
         'classname' => 'local_queue\task\cron_queue_refresher',
-        'blocking' => 0,
+        'blocking' => 1,
         'minute' => '*',
         'hour' => '*',
         'day' => '*',

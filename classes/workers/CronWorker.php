@@ -77,7 +77,7 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
     public function begin() {
         global $CFG;
 
-        $php = "/usr/bin/php";
+        $php = PHP_BINARY;
         $dir = LOCAL_QUEUE_FOLDER;
         if (!is_dir($dir.'/logs')) {
             mkdir($dir.'/logs');
@@ -89,10 +89,14 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
             'broker' => $this->item->broker,
             'job' => $this->item->job
         );
-        // $nice = 'nice -n '.( (2*$this->item->priority) - 20);
-        $nice = 'nice -n '.($this->item->priority - 20);
-        $cmd = $nice. ' '. $php.' '. $dir.'/worker.php';
-
+        $cmd = $php.' '. $dir.'/worker.php '.$this->item->hash;
+        if (PHP_OS == "Linux" && local_queue_defaults('usenice')) {
+            $niceness = (4 * $this->item->priority) - 20;
+            if ($niceness != 0) {
+                $nice = 'nice -n '.$niceness;
+                $cmd = $nice .' '. $cmd;
+            }
+        }
         $this->starttime = time();
         $specs = $this->specs;
         $outputdir = $dir. '/'. $specs[1][1];

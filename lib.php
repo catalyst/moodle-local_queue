@@ -30,18 +30,37 @@ define('QUEUE_BROKERS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/brokers');
 define('QUEUE_JOBS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/jobs');
 define('QUEUE_REFRESHER_CLASS', '\local_queue\task\cron_queue_refresher');
 
+
+/**
+ * Extracts the class name from a fully-qualified-class-name string
+ *
+ * @param string $fullname fully-qualified-class-name string.
+ * @return string
+ */
 function local_queue_extract_classname($fullname) {
     $parts = explode('\\', $fullname);
     $name = end($parts);
     return $name;
 }
 
+/**
+ * Extracts the parent class from a fully-qualified-class-name string
+ *
+ * @param string $task fully-qualified-class-name string.
+ * @return string
+ */
 function local_queue_task_type_from_class($task) {
     $fullname = get_parent_class($task);
     return local_queue_extract_classname($fullname);
 }
 
-function local_queue_task_table($taskname) {
+/**
+ * Extracts the parent class from a fully-qualified-class-name string
+ *
+ * @param string $task fully-qualified-class-name string.
+ * @return string
+ */
+function local_queue_cron_task_table($taskname) {
     if (strpos($taskname, '\\') !== false) {
         $classname = local_queue_extract_classname($taskname);
     } else {
@@ -55,14 +74,14 @@ function local_queue_task_table($taskname) {
 function local_queue_task_record($type, $id) {
     global $DB;
 
-    return $DB->get_record(local_queue_task_table($type), ['id' => $id], '*', MUST_EXIST);
+    return $DB->get_record(local_queue_cron_task_table($type), ['id' => $id], '*', MUST_EXIST);
 }
 
 function local_queue_ban_task_record($classname, $id) {
     global $DB;
 
     $type = local_queue_task_type_from_class($classname);
-    $table = local_queue_task_table($type);
+    $table = local_queue_cron_task_table($type);
     if ($type == 'scheduled_task') {
         return $DB->set_field($table, 'disabled', true, ['id' => $id]);
     } else {
@@ -132,11 +151,9 @@ function local_queue_class_scanner($dir, $types, &$classes = []) {
                             if ($extends != '' && strpos($extends, '\\') === false) {
                                 $extends = $namespace == '' ? $extends : $namespace. '\\'. $extends;
                             }
-
                             if ($implements != '' && strpos($implements, '\\') === false) {
                                 $implements = $namespace == '' ? $implements : $namespace. '\\'. $implements;
                             }
-
                             if (in_array($extends, $types) || in_array($implements, $types)) {
                                 $data = [
                                     'path' => $path,
@@ -173,6 +190,23 @@ function local_queue_is_empty_dir($folder) {
     return true;
 }
 
+function local_queue_rm_local_dir($dir) {
+    $folder = LOCAL_QUEUE_FOLDER.DIRECTORY_SEPARATOR.$dir;
+    if (is_dir($folder)) {
+        $files = scandir($folder);
+        foreach ($files as $key => $value) {
+            $path = realpath($folder.DIRECTORY_SEPARATOR.$value);
+            $localpath = $dir.DIRECTORY_SEPARATOR.$value;
+            if (!is_dir($path)) {
+                unlink($path);
+            } else if ($value != "." && $value != ".." ) {
+                local_queue_rm_local_dir($localpath);
+            }
+        }
+        rmdir($folder);
+    }
+}
+
 function local_queue_class_loader($folder, $classname) {
     $classes = local_queue_class_scanner($folder, [$classname]);
     if (!empty($classes)) {
@@ -187,11 +221,12 @@ function local_queue_defaults($wanted = null) {
     $defaults = [
         'mechanics' => true,
         'keeplogs' => false,
+        'usenice' => false,
         'pipesnumber' => 10,
         'handletime' => 2,
         'waittime' => 30,
         'attempts' => 10,
-        'priority' => 20,
+        'priority' => 5,
         'cronworker' => '\\local_queue\\workers\\CronWorker',
         'croncontainer' => '\\local_queue\\containers\\DefaultContainer',
         'cronjob' => '\\local_queue\\jobs\\SilentCronJob',
@@ -205,6 +240,9 @@ function local_queue_defaults($wanted = null) {
         }
         if (isset($config['local_queue_keeplogs'])) {
             $defaults['keeplogs'] = $config['local_queue_keeplogs'];
+        }
+        if (isset($config['local_queue_usenice'])) {
+            $defaults['usenice'] = $config['local_queue_usenice'];
         }
         if (isset($config['local_queue_pipesnumber'])) {
             $defaults['pipesnumber'] = $config['local_queue_pipesnumber'];
@@ -341,6 +379,7 @@ function queue_task_record($classname, $strict = false) {
     $params = ['classname' => $classname];
     return $DB->get_record_select('local_queue_tasks', $where, $params, '*', $strictness);
 }
+
 /**
  * Return queue item record.
  *
@@ -434,7 +473,7 @@ function local_queue_item_closure(\stdClass $item) {
 }
 
 function local_queue_is_refresher(\stdClass $item) {
-    $is = false;    
+    $is = false;
     $payload = json_decode($item->payload);
     if (property_exists($payload, 'task')) {
         if ($payload->task == QUEUE_REFRESHER_CLASS) {
@@ -458,4 +497,12 @@ function  local_queue_refresher() {
     $queuerefresher = $DB->get_record_select('task_scheduled', $where, $params, '*', MUST_EXIST);
     local_queue_item_prepare($queuerefresher);
     return true;
+}
+
+function  local_queue_requeue_orphans($time) {
+    global $DB;
+
+    $where = 'timestarted < :timestarted AND running = 1';
+    $params = ['timestarted' => $time];
+    return $DB->set_field_select('local_queue_items', 'running', 0, $where, $params);
 }

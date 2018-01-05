@@ -28,27 +28,58 @@ require_once(LOCAL_QUEUE_FOLDER.'/interfaces/QueueWorker.php');
 require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
 use \local_queue\QueueLogger as QueueLogger;
 
-class CronWorker implements \local_queue\interfaces\QueueWorker{
-    // Internal - worker specs.
+class DefaultWorker implements \local_queue\interfaces\QueueWorker{
+    /**
+     * Worker process pipes specifications.
+     */
     private $specs = array(
        0 => array("pipe", "r"),
        1 => array('file', 'logs/output/', 'w'),
        2 => array('file', 'logs/errors/', 'w'),
     );
-
+    /**
+     * Array containing the worker process pipes.
+     */
     private $pipes = [];
+    /**
+     * The queue item object.
+     */
     private $item;
+    /**
+     * The worker process pointer.
+     */
     private $process;
-
+    /**
+     * The Process ID of the worker process
+     */
     public $pid;
+    /**
+     * The time the worker began work.
+     */
     public $starttime;
+    /**
+     * If there were errors mark as true.
+     */
     public $failed = false;
+    /**
+     * Path to the output file.
+     */
     public $outputfile;
+    /**
+     * Path to the errors file.
+     */
     public $errorfile;
-    public $error = '';
+    /**
+     * Queue item hash.
+     */
     public $hash;
 
-
+    /**
+     * Validate the queue item object.
+     *
+     * @param stdClass $item the queue item object.
+     * @return boolean
+     */
     private function validate($item) {
         if (empty($item)) {
             return false;
@@ -66,6 +97,11 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         return $ok;
     }
 
+    /**
+     * Assign the queue item.
+     *
+     * @param stdClass $item the queue item object.
+     */
     public function set_item($item) {
         if ($this->validate($item)) {
             $this->item = $item;
@@ -74,6 +110,9 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         }
     }
 
+    /**
+     * Start the worker process.
+     */
     public function begin() {
         global $CFG;
 
@@ -90,10 +129,10 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
             'job' => $this->item->job
         );
         $cmd = $php.' '. $dir.'/worker.php '.$this->item->hash;
-        if (PHP_OS == "Linux" && local_queue_defaults('usenice')) {
+        if (PHP_OS == "Linux" && local_queue_configuration('usenice')) {
             $niceness = (4 * $this->item->priority) - 20;
             if ($niceness != 0) {
-                $nice = 'nice -n '.$niceness;
+                $nice = 'nice -n '. $niceness;
                 $cmd = $nice .' '. $cmd;
             }
         }
@@ -125,6 +164,11 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         $this->hash = $this->item->hash;
     }
 
+    /**
+     * Check the status of the worker pipe.
+     *
+     * @return array
+     */
     private function get_status() {
         $status = [];
         if (is_resource($this->process)) {
@@ -135,6 +179,11 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         return $status;
     }
 
+    /**
+     * Check if the worker pipe is still running.
+     *
+     * @return boolean
+     */
     public function running() {
         $status = $this->get_status();
         if (isset($status['running'])) {
@@ -143,10 +192,20 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         return false;
     }
 
+    /**
+     * Return the assigned queue item object.
+     *
+     * @return stdClass
+     */
     public function get_item() {
         return $this->item;
     }
 
+    /**
+     * Check if there are any errors.
+     *
+     * @return boolean
+     */
     private function errors() {
         $found = false;
         if ($pipe = fopen($this->errorfile, 'r')) {
@@ -157,6 +216,9 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         return $found;
     }
 
+    /**
+     * Close the worker pipe and do some clean up.
+     */
     public function finish() {
         foreach ($this->pipes as $pipe) {
             if (is_resource($pipe)) {
@@ -166,12 +228,24 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         if (is_resource($this->process)) {
             proc_close($this->process);
         }
+        unset($this->pipes);
+        unset($this->item);
+        unset($this->process);
+        unset($this->pid);
+        unset($this->starttime);
+        unset($this->failed);
+        unset($this->outputfile);
+        unset($this->errorfile);
+        unset($this->hash);
         gc_collect_cycles();
     }
 
+    /**
+     * Return the report about worker pipe process.
+     *
+     * @return array
+     */
     public function get_report() {
-        $errors = $this->errors();
-        $this->item->running = false;
         $error = '';
         if ($this->errors()) {
             $error = $this->errorfile;
@@ -193,6 +267,13 @@ class CronWorker implements \local_queue\interfaces\QueueWorker{
         $report['action'] = $action;
         $report['output'] = $this->outputfile;
         $report['error'] = $error;
+        $report['failed'] = $this->failed;
+        $this->item->running = false;
+        unset($action);
+        unset($this->outputfile);
+        unset($this->errorfile);
+        unset($error);
+        unset($this->failed);
         return $report;
     }
 }

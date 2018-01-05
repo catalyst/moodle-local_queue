@@ -25,6 +25,10 @@ namespace local_queue\task;
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once($CFG->dirroot.'/local/queue/lib.php');
+require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueItemHelper.php');
+use \local_queue\QueueItemHelper;
+
 class cron_queue_refresher extends \core\task\scheduled_task {
 
     /**
@@ -51,24 +55,27 @@ class cron_queue_refresher extends \core\task\scheduled_task {
             SELECT ts.id, ts.classname,
              (CASE ts.nextruntime WHEN NULL THEN :now1 ELSE ts.nextruntime END) AS runtime
             FROM {task_scheduled} ts
-            WHERE (ts.lastruntime IS NULL OR ts.lastruntime < :lr)
-            AND (ts.nextruntime IS NULL OR ts.nextruntime < :nr1)
+            WHERE (ts.lastruntime IS NULL OR ts.lastruntime <= :lr)
+            AND (ts.nextruntime IS NULL OR ts.nextruntime <= :nr1)
             AND ts.disabled = 0
             UNION ALL
             SELECT ta.id, ta.classname,
              (CASE ta.nextruntime WHEN NULL THEN :now2 ELSE ta.nextruntime END) AS runtime
             FROM {task_adhoc} ta
-            WHERE (ta.nextruntime IS NULL OR ta.nextruntime < :nr2)
+            WHERE (ta.nextruntime IS NULL OR ta.nextruntime <= :nr2)
         ) task ORDER BY runtime ASC
         ';
         $params = ['now1' => $now, 'now2' => $now, 'lr' => $lastrun, 'nr1' => $nextrun, 'nr2' => $nextrun];
         $records = $DB->get_records_sql($sql, $params);
         $keys = ['id', 'classname', 'nextruntime'];
         $found = count($records);
+        $queueservice = local_queue_configuration('mainqueueservice');
         foreach ($records as $key => $value) {
             $record = (object) array_combine($keys, explode(',', substr($value->task, 1, -1)));
             $record->classname = stripslashes(substr($record->classname, 1, -1));
-            local_queue_item_prepare($record);
+            $item = QueueItemHelper::prepare_queue_item($record, 'cron');
+            $queueservice::publish($item, 'cron');
+            unset($item);
             unset($records[$key]);
         }
         echo " $found Queue item(s) refreshed. ";

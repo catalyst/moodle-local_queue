@@ -20,40 +20,14 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @author     Ionut Marchis <ionut.marchis@catalyst-eu.net>
  */
-namespace local_queue\jobs;
+namespace local_queue\interfaces;
 
 defined('MOODLE_INTERNAL') || die();
-require_once(dirname(__FILE__).'/BaseCronJob.php');
-require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
-use \local_queue\QueueLogger;
 
-class SilentCronJob extends \local_queue\jobs\BaseCronJob {
-    private $task;
-
-    public function __construct(\core\task\task_base $task) {
-        $this->task = $task;
-    }
-
-    public function start() {
-        parent::prepare();
-        QueueLogger::systemlog("");
-        try {
-            get_mailer('buffer');
-            $this->task->execute();
-            $this->success();
-        } catch (Exception $e) {
-            $this->failed($e);
-        }
-        parent::finish();
-    }
-
-    public function failed($exception) {
-        parent::failed($exception);
-        parent::manage($this->task, 'failed');
-    }
-
-    public function success() {
-        parent::success();
-        parent::manage($this->task, 'complete');
-    }
+interface QueueService {
+    public static function consume($count);
+    public static function publish($item, $queue);
+    public static function ack($item);
+    public static function nack($item);
+    public static function ban($item);
 }

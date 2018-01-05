@@ -28,8 +28,10 @@ define('QUEUE_CONTAINERS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/containers');
 define('QUEUE_WORKERS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/workers');
 define('QUEUE_BROKERS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/brokers');
 define('QUEUE_JOBS_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/jobs');
+define('QUEUE_SERVICES_FOLDER', LOCAL_QUEUE_FOLDER.'/classes/services');
 define('QUEUE_REFRESHER_CLASS', '\local_queue\task\cron_queue_refresher');
-
+define('QUEUE_ITEMS_TABLE', 'local_queue_items');
+define('QUEUE_ITEM_SETTINGS_TABLE', 'local_queue_items_settings');
 
 /**
  * Extracts the class name from a fully-qualified-class-name string
@@ -55,9 +57,19 @@ function local_queue_task_type_from_class($task) {
 }
 
 /**
- * Extracts the parent class from a fully-qualified-class-name string
+ * Get queue task user-friendly name.
  *
- * @param string $task fully-qualified-class-name string.
+ * @param string $classname classname
+ * @return string
+ */
+function local_queue_task_name($classname) {
+    $obj = new $classname();
+    return method_exists($obj, 'get_name') ? $obj->get_name() : local_queue_extract_classname($classname);
+}
+/**
+ * Extracts moodle cron task table name from a fully-qualified-class-name string
+ *
+ * @param string $taskname fully-qualified-class-name string.
  * @return string
  */
 function local_queue_cron_task_table($taskname) {
@@ -71,25 +83,27 @@ function local_queue_cron_task_table($taskname) {
     return implode('_', $reversed);
 }
 
-function local_queue_task_record($type, $id) {
+/**
+ * Get the cron task record by type (adhoc/scheduled) and id
+ *
+ * @param string $type cron task type string.
+ * @param string $id table entry id.
+ * @return object
+ */
+function local_queue_cron_task_record($type, $id) {
     global $DB;
 
     return $DB->get_record(local_queue_cron_task_table($type), ['id' => $id], '*', MUST_EXIST);
 }
 
-function local_queue_ban_task_record($classname, $id) {
-    global $DB;
-
-    $type = local_queue_task_type_from_class($classname);
-    $table = local_queue_cron_task_table($type);
-    if ($type == 'scheduled_task') {
-        return $DB->set_field($table, 'disabled', true, ['id' => $id]);
-    } else {
-        return $DB->set_field($table, 'nextruntime', strtotime("-1 year"), ['id' => $id]);
-    }
-}
-
-
+/**
+ * Get a list of classes from a folder by type.
+ *
+ * @param string $dir directory string.
+ * @param array $types array of parent classes or interfaces.
+ * @param array $classes array to load the results in.
+ * @return array
+ */
 function local_queue_class_scanner($dir, $types, &$classes = []) {
     $files = scandir($dir);
     foreach ($files as $key => $value) {
@@ -101,6 +115,7 @@ function local_queue_class_scanner($dir, $types, &$classes = []) {
                 $tokens = token_get_all($code);
                 $count = count($tokens);
                 $namespace = $name = $extends = $implements = '';
+                $abstract = false;
                 for ($i = 2; $i < $count; $i++) {
                     if ($tokens[$i - 2][0] == T_NAMESPACE && $tokens[$i - 1][0] == T_WHITESPACE && $tokens[$i][0] == T_STRING) {
                         for ($j = $i; $j < $count; $j++) {
@@ -110,6 +125,9 @@ function local_queue_class_scanner($dir, $types, &$classes = []) {
                                 break;
                             }
                         }
+                    }
+                    if ($tokens[$i - 1][0] == T_ABSTRACT) {
+                        $abstract = true;
                     }
                     if ($tokens[$i - 2][0] == T_CLASS && $tokens[$i - 1][0] == T_WHITESPACE && $tokens[$i][0] == T_STRING) {
                         $name = $tokens[$i][1];
@@ -155,15 +173,17 @@ function local_queue_class_scanner($dir, $types, &$classes = []) {
                                 $implements = $namespace == '' ? $implements : $namespace. '\\'. $implements;
                             }
                             if (in_array($extends, $types) || in_array($implements, $types)) {
-                                $data = [
-                                    'path' => $path,
-                                    'namespace' => $namespace,
-                                    'name' => $name,
-                                    'classname' => $classname,
-                                    'implements' => $implements,
-                                    'extends' => $extends
-                                ];
-                                $classes[stripslashes($classname)] = $data;
+                                if (!$abstract) {
+                                    $data = [
+                                        'path' => $path,
+                                        'namespace' => $namespace,
+                                        'name' => $name,
+                                        'classname' => $classname,
+                                        'implements' => $implements,
+                                        'extends' => $extends
+                                    ];
+                                    $classes[stripslashes($classname)] = $data;
+                                }
                             }
                         }
                     }
@@ -177,6 +197,12 @@ function local_queue_class_scanner($dir, $types, &$classes = []) {
     return $classes;
 }
 
+/**
+ * Check if a folder is empty.
+ *
+ * @param string $folder directory string.
+ * @return boolean
+ */
 function local_queue_is_empty_dir($folder) {
     if ($handle = opendir($folder)) {
         while (false !== ($entry = readdir($handle))) {
@@ -190,6 +216,11 @@ function local_queue_is_empty_dir($folder) {
     return true;
 }
 
+/**
+ * Remove a local_queue folder recursively.
+ *
+ * @param string $dir directory string.
+ */
 function local_queue_rm_local_dir($dir) {
     $folder = LOCAL_QUEUE_FOLDER.DIRECTORY_SEPARATOR.$dir;
     if (is_dir($folder)) {
@@ -207,15 +238,13 @@ function local_queue_rm_local_dir($dir) {
     }
 }
 
-function local_queue_class_loader($folder, $classname) {
-    $classes = local_queue_class_scanner($folder, [$classname]);
-    if (!empty($classes)) {
-        $class = current($classes);
-        require_once($class['path']);
-    }
-}
-
-function local_queue_defaults($wanted = null) {
+/**
+ * Get the local_queue general settings configuration.
+ *
+ * @param string|null $wanted specific setting name string.
+ * @return array|string.
+ */
+function local_queue_configuration($wanted = null) {
     $cache = \cache::make('core', 'config');
     $cache->purge();
     $defaults = [
@@ -223,14 +252,10 @@ function local_queue_defaults($wanted = null) {
         'keeplogs' => false,
         'usenice' => false,
         'pipesnumber' => 10,
-        'handletime' => 2,
-        'waittime' => 30,
+        'waittime' => 500000,
         'attempts' => 10,
         'priority' => 5,
-        'cronworker' => '\\local_queue\\workers\\CronWorker',
-        'croncontainer' => '\\local_queue\\containers\\DefaultContainer',
-        'cronjob' => '\\local_queue\\jobs\\SilentCronJob',
-        'cronbroker' => '\\local_queue\\brokers\\CronBroker',
+        'mainqueueservice' => '\\local_queue\\services\\DatabaseQueueService'
     ];
     // Get defined configuration.
     $config = (array) get_config('local_queue');
@@ -247,26 +272,17 @@ function local_queue_defaults($wanted = null) {
         if (isset($config['local_queue_pipesnumber'])) {
             $defaults['pipesnumber'] = $config['local_queue_pipesnumber'];
         }
-        if (isset($config['local_queue_handletime'])) {
-            $defaults['handletime'] = $config['local_queue_handletime'];
-        }
         if (isset($config['local_queue_waittime'])) {
             $defaults['waittime'] = $config['local_queue_waittime'];
         }
         if (isset($config['local_queue_attempts'])) {
             $defaults['attempts'] = $config['local_queue_attempts'];
         }
-        if (isset($config['local_queue_cronworker'])) {
-            $defaults['cronworker'] = $config['local_queue_cronworker'];
+        if (isset($config['local_queue_priority'])) {
+            $defaults['priority'] = $config['local_queue_priority'];
         }
-        if (isset($config['local_queue_croncontainer'])) {
-            $defaults['croncontainer'] = $config['local_queue_croncontainer'];
-        }
-        if (isset($config['local_queue_cronjob'])) {
-            $defaults['cronjob'] = $config['local_queue_cronjob'];
-        }
-        if (isset($config['local_queue_cronbroker'])) {
-            $defaults['cronbroker'] = $config['local_queue_cronbroker'];
+        if (isset($config['local_queue_mainqueueservice'])) {
+            $defaults['mainqueueservice'] = $config['local_queue_mainqueueservice'];
         }
     }
     if ($wanted != null && isset($defaults[$wanted])) {
@@ -275,234 +291,63 @@ function local_queue_defaults($wanted = null) {
     return $defaults;
 }
 
-function local_queue_crontasks() {
-    global $CFG, $SESSION;
-
-    $scheduled = \core\task\manager::get_all_scheduled_tasks();
-    $tasks = [];
-    foreach ($scheduled as $key => $task) {
-        $tasks[stripslashes(get_class($task))] = local_queue_apply_crontask_defaults($task);
-        unset($scheduled[$key]);
-    }
-    return $tasks;
-}
-
-function local_queue_apply_crontask_defaults($task) {
-    global $CFG;
-
-    if (is_object($task)) {
-        $obj = $task;
-        $task = [];
-        if (property_exists($obj, 'classname')) {
-            $task['classname'] = $obj->classname;
-        } else {
-            $task['classname'] = '\\'. get_class($obj);
-        }
-        unset($obj);
-    }
-    $queuetask = queue_task_record($task['classname']);
-    if ($queuetask) {
-        $task = (array) $queuetask;
-    }
-    $task['name'] = local_queue_crontask_name($task['classname']);
-    if (!$queuetask) {
-        $defaults = local_queue_defaults();
-        if (isset($task['worker']) === false) {
-            $task['worker'] = $defaults['cronworker'];
-        }
-        if (isset($task['broker']) === false) {
-            $task['broker'] = $defaults['cronbroker'];
-        }
-        if (isset($task['container']) === false) {
-            $task['container'] = $defaults['croncontainer'];
-        }
-        if (isset($task['job']) === false) {
-            $task['job'] = $defaults['cronjob'];
-        }
-        if (isset($task['priority']) === false) {
-            $task['priority'] = $defaults['priority'];
-        }
-        if (isset($task['attempts']) === false) {
-            $task['attempts'] = $defaults['attempts'];
-        }
-        $task["timecreated"] = time();
-        $table = 'local_queue_tasks';
-        $id = save_update_queue_data((object)$task, $table);
-        $task['id'] = $id;
-    }
-    return $task;
-}
-
 /**
- * Update/save queue table entry
+ * Create/update the cron refresher queue item.
  *
- * @param stdClass $data queue task data to be inserted/updated
- * @param string $table name of the table
- * @return stdClass
  */
-function save_update_queue_data(\stdClass $data, $table) {
-    global $DB;
-    if (property_exists($data, 'id')) {
-        $data->timechanged = time();
-        $DB->update_record($table, $data);
-        return $data->id;
-    } else {
-        return $DB->insert_record($table, $data, true);
-    }
-}
-
-/**
- * Delete queue table entry
- *
- * @param string $id queue entry id
- * @param string $table name of the table
- * @return stdClass
- */
-function remove_queue_data($id, $table) {
-    global $DB;
-
-    return $DB->delete_records($table, ['id' => $id]);
-}
-
-/**
- * Return queue task record.
- *
- * @param string $classname task classname
- * @param boolean $strict search strictness, if true MUST_EXIST else IGNORE_MISSING, default false
- * @return stdClass|false
- */
-function queue_task_record($classname, $strict = false) {
-    global $DB;
-
-    $strictness = $strict ? MUST_EXIST : IGNORE_MISSING;
-    $where = 'classname = :classname';
-    $params = ['classname' => $classname];
-    return $DB->get_record_select('local_queue_tasks', $where, $params, '*', $strictness);
-}
-
-/**
- * Return queue item record.
- *
- * @param string $hash queue item hash
- * @param boolean $strict search strictness, if true MUST_EXIST else IGNORE_MISSING, default false
- * @return stdClass|false
- */
-function queue_item_record($hash, $strict = false) {
-    global $DB;
-
-    $strictness = $strict ? MUST_EXIST : IGNORE_MISSING;
-    $where = 'hash = :hash';
-    $params = ['hash' => $hash];
-    return $DB->get_record_select('local_queue_items', $where, $params, '*', $strictness);
-}
-
-function local_queue_crontask_name($classname) {
-    $obj = new $classname();
-    return method_exists($obj, 'get_name') ? $obj->get_name() : local_queue_extract_classname($classname);
-}
-
-function local_queue_crontask($id) {
-    global $DB;
-
-    $where = 'id = :id';
-    $params = ['id' => $id];
-    $task = (array) $DB->get_record_select('local_queue_tasks', $where, $params, '*', MUST_EXIST);
-    $task['name'] = local_queue_crontask_name($task['classname']);
-    return $task;
-}
-
-function local_queue_item_prepare(\stdClass $record) {
-    if (!property_exists($record, 'classname') || !property_exists($record, 'id') ) {
-        return false;
-    }
-    $hash = stripslashes($record->classname).'_'.$record->id;
-    $item = queue_item_record($hash);
-    $settings = (object) local_queue_apply_crontask_defaults($record);
-    if (!$item) {
-        $item = new \stdClass();
-        $item->payload = json_encode([
-            'task' => $record->classname,
-            'record' => $record->id
-        ]);
-        $item->attempts = $settings->attempts;
-        $item->banned = false;
-        $item->running = false;
-        $item->hash = $hash;
-        $item->timecreated = time();
-        $item->task = $settings->id;
-    } else {
-        if ($item->attempts > $settings->attempts || local_queue_is_refresher($item)) {
-            $item->attempts = $settings->attempts;
-        }
-    }
-    $item->container = $settings->container;
-    $item->job = $settings->job;
-    $item->priority = $settings->priority;
-    $item->worker = $settings->worker;
-    $item->broker = $settings->broker;
-    $item->id = save_update_queue_data($item, 'local_queue_items');
-    return $item;
-}
-
-function local_queue_item_running(\stdClass $item) {
-    $item->timestarted = time();
-    $item->running = true;
-    save_update_queue_data($item, 'local_queue_items');
-}
-
-function local_queue_item_ban(stdClass $item) {
-    $item->timecompleted = time();
-    $item->timechanged = time();
-    $item->running = false;
-    $item->banned = true;
-    $item->attempts = 0;
-    save_update_queue_data($item, 'local_queue_items');
-    $payload = json_decode($item->payload);
-    if (property_exists($payload, 'classname') && property_exists($payload, 'record')) {
-        local_queue_ban_task_record($payload->classname, $payload->record);
-    }
-}
-
-function local_queue_item_closure(\stdClass $item) {
-    $item->timecompleted = time();
-    if (!local_queue_is_refresher($item)) {
-        return remove_queue_data($item->id, 'local_queue_items');
-    } else {
-        return save_update_queue_data($item, 'local_queue_items');
-    }
-}
-
-function local_queue_is_refresher(\stdClass $item) {
-    $is = false;
-    $payload = json_decode($item->payload);
-    if (property_exists($payload, 'task')) {
-        if ($payload->task == QUEUE_REFRESHER_CLASS) {
-            $is = true;
-        }
-    }
-    return $is;
-}
-
-function local_queue_item_requeued(\stdClass $item) {
-    $item->timecompleted = time();
-    $item->timechanged = time();
-    save_update_queue_data($item, 'local_queue_items');
-}
-
-function  local_queue_refresher() {
+function  local_queue_cron_refresher() {
     global $DB;
 
     $where = 'classname = :classname';
     $params = ['classname' => QUEUE_REFRESHER_CLASS];
-    $queuerefresher = $DB->get_record_select('task_scheduled', $where, $params, '*', MUST_EXIST);
-    local_queue_item_prepare($queuerefresher);
-    return true;
+    $cronrefresher = $DB->get_record_select('task_scheduled', $where, $params, '*', MUST_EXIST);
+    $item = \local_queue\QueueItemHelper::prepare_queue_item($cronrefresher, 'cron');
+    unset($cronrefresher);
+    ob_start();
+    $queueservice = local_queue_configuration('mainqueueservice');
+    $queueservice::publish($item, 'cron');
+    ob_clean();
+    unset($item);
 }
 
-function  local_queue_requeue_orphans($time) {
+/**
+ * Get list of queue items settings.
+ *
+ * @param string $queue the name of the queue to load items settings.
+ * @return array.
+ */
+function local_queue_items_settings($queue = 'cron') {
     global $DB;
 
-    $where = 'timestarted < :timestarted AND running = 1';
-    $params = ['timestarted' => $time];
-    return $DB->set_field_select('local_queue_items', 'running', 0, $where, $params);
+    $condition = ['queue' => $queue];
+    $settings = $DB->get_records(QUEUE_ITEM_SETTINGS_TABLE, $condition, 'priority ASC');
+    if (count($settings) <= 1) {
+        $scheduled = \core\task\manager::get_all_scheduled_tasks();
+        $settings = [];
+        foreach ($scheduled as $key => $task) {
+            $classname = "\\". get_class($task);
+            $hash = stripslashes($classname);
+            $itemsetting = \local_queue\QueueItemHelper::item_settings_data($classname, $queue);
+            $settings[$hash] = $itemsetting;
+            unset($itemsetting);
+            unset($scheduled[$key]);
+        }
+    }
+    return $settings;
+}
+
+/**
+ * Get the record of queue items settings.
+ *
+ * @param int|string $id the ID of the queue item settings.
+ * @return array.
+ */
+function local_queue_item_settings($id) {
+    global $DB;
+
+    $where = 'id = :id';
+    $params = ['id' => $id];
+    $task = (array) $DB->get_record_select(QUEUE_ITEM_SETTINGS_TABLE, $where, $params, '*', MUST_EXIST);
+    $task['name'] = local_queue_task_name($task['classname']);
+    return $task;
 }

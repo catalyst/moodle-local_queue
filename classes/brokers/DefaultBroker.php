@@ -20,14 +20,32 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @author     Ionut Marchis <ionut.marchis@catalyst-eu.net>
  */
-namespace local_queue\interfaces;
+namespace local_queue\brokers;
 
 defined('MOODLE_INTERNAL') || die();
+require_once($CFG->dirroot.'/local/queue/lib.php');
+require_once(LOCAL_QUEUE_FOLDER.'/interfaces/QueueBroker.php');
+require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
+use \local_queue\QueueLogger;
 
-interface Queue {
-    public function consume($count);
-    public function publish($item);
-    public function ack($item);
-    public function nack($item);
-    public function ban($item);
+
+class DefaultBroker implements \local_queue\interfaces\QueueBroker{
+    private $classname;
+
+    public function __construct($payload) {
+        $payload = json_decode($payload, true);
+        $classname = $payload['task'];
+        if (strpos($classname, '\\') !== 0) {
+            $classname = '\\' . $classname;
+        }
+        $this->classname = $classname;
+    }
+
+    public function get_task() {
+        if (!class_exists($this->classname)) {
+            QueueLogger::error("Failed to load task class: ". $this->classname);
+        } else {
+            return new $this->classname();
+        }
+    }
 }

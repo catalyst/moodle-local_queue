@@ -29,6 +29,9 @@ if ($hassiteconfig) {
     $queuesettings = get_string('generalsettings', $localqueue);
     $settings = new admin_settingpage('local_queue_generalsettings', $queuesettings);
 
+    $queuemanagerdefaults = get_string('queuemanagerdefaults', $localqueue);
+    $settings->add(new admin_setting_heading('queuemanagerdefaults', $queuemanagerdefaults, ''));
+
     // Include system mechanics output in the logs?
     $showmechanics = get_string('showmechanics', $localqueue);
     $showmechanicshelp = get_string('showmechanics_help', $localqueue);
@@ -71,16 +74,6 @@ if ($hassiteconfig) {
         10
     ));
 
-    // Time before moving to background.
-    $handletime = get_string('handletime', $localqueue);
-    $handletimehelp = get_string('handletime_help', $localqueue);
-    $settings->add(new admin_setting_configtext(
-        'local_queue/local_queue_handletime',
-        $handletime,
-        $handletimehelp,
-        2
-    ));
-
     // Time to wait between queue cycles.
     $waittime = get_string('waittime', $localqueue);
     $waittimehelp = get_string('waittime_help', $localqueue);
@@ -88,8 +81,11 @@ if ($hassiteconfig) {
         'local_queue/local_queue_waittime',
         $waittime,
         $waittimehelp,
-        30
+        500000
     ));
+
+    $queueitemsdefaults = get_string('queueitemsdefaults', $localqueue);
+    $settings->add(new admin_setting_heading('queueitemsdefaults', $queueitemsdefaults, ''));
 
     // Fail attempts.
     $attempts = get_string('attempts', $localqueue);
@@ -99,6 +95,45 @@ if ($hassiteconfig) {
         $attempts,
         $attemptshelp,
         10
+    ));
+
+    // Priority.
+    $priority = get_string('priority', $localqueue);
+    $priorityhelp = get_string('priority_help', $localqueue);
+    for ($i = 0; $i < 11; $i++) {
+        $priorities[$i] = $i;
+    }
+    $priorities[0] = $priorities[0].' - '. get_string('highest', $localqueue);
+    $priorities[5] = $priorities[5].' - '. get_string('normal', $localqueue);
+    $priorities[10] = $priorities[10].' - '. get_string('lowest', $localqueue);
+    $settings->add(new admin_setting_configselect(
+        'local_queue/local_queue_priority',
+        $priority,
+        $priorityhelp,
+        5,
+        $priorities
+    ));
+
+    $queueservice = 'Queue Service';
+    $settings->add(new admin_setting_heading('queueservice', $queueservice, ''));
+
+
+    // The default queue class.
+    $types = ['\local_queue\interfaces\QueueService'];
+    $folder = QUEUE_SERVICES_FOLDER;
+    $queues = local_queue_class_scanner($folder, $types);
+    $queueoptions = [];
+    foreach ($queues as $queue) {
+        $queueoptions[$queue['classname']] = $queue['name'];
+    }
+    $mainqueueservice = get_string('mainqueueservice', $localqueue);
+    $mainqueueservicehelp = get_string('mainqueueservice_help', $localqueue);
+    $settings->add(new admin_setting_configselect(
+        'local_queue/local_queue_mainqueue',
+        $mainqueueservice,
+        $mainqueueservicehelp,
+        null,
+        $queueoptions
     ));
 
     $crondefaults = get_string('crondefaults', $localqueue);
@@ -175,7 +210,7 @@ if ($hassiteconfig) {
         null,
         $joboptions
     ));
-    // Install/update local queue refresher task.
-    local_queue_refresher();
+    // Install/update local queue cron refresher task.
+    local_queue_cron_refresher();
     $ADMIN->add('local_queue', $settings);
 }

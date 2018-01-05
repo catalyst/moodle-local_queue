@@ -32,13 +32,14 @@ class QueueLogger {
     const YELLOW = "\033[33m";
     const PURPLE = "\033[35m";
     const BLACK = "\033[0m";
+    const RED = "\033[31m";
 
     public static function systemlog($message, $color = self::BLACK) {
         $ce = self::BLACK;
-        if (local_queue_defaults('mechanics')) {
+        if (local_queue_configuration('mechanics')) {
             if (defined('STDOUT')) {
                 if (posix_isatty(STDOUT)) {
-                    self::log($color.' '.$message.$ce);
+                    self::log($color. ' '. $message.$ce);
                 } else {
                     self::log($message);
                 }
@@ -51,6 +52,8 @@ class QueueLogger {
     public static function log($message) {
         if (defined('STDOUT')) {
             fwrite(STDOUT, $message.PHP_EOL);
+        } else {
+            echo $message.PHP_EOL;
         }
     }
 
@@ -60,10 +63,10 @@ class QueueLogger {
     }
 
     public static function read($filename, $hash = '') {
-        $unlink = !local_queue_defaults('keeplogs');
+        $unlink = !local_queue_configuration('keeplogs');
         if ($outputpipe = fopen($filename, 'r')) {
             while (!feof($outputpipe)) {
-                $output = $hash. ' '.fgets($outputpipe);
+                $output = $hash. ' '. fgets($outputpipe);
                 if (defined('STDOUT') and !PHPUNIT_TEST) {
                     fwrite(STDOUT, $output);
                 } else {

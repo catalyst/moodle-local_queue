@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot.'/local/queue/lib.php');
 require_once(LOCAL_QUEUE_FOLDER.'/interfaces/QueueJob.php');
 require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
-use \local_queue\QueueLogger as QueueLogger;
+use \local_queue\QueueLogger;
 
 abstract class BaseCronJob implements \local_queue\interfaces\QueueJob {
     private $task;

@@ -41,13 +41,13 @@ require_capability('moodle/site:config', context_system::instance());
 $renderer = $PAGE->get_renderer('local_queue');
 
 $action = optional_param('action', '', PARAM_ALPHAEXT);
-$taskname = optional_param('task', '', PARAM_RAW);
+$taskid = optional_param('task', '', PARAM_RAW);
 
 $task = null;
 $mform = null;
 
-if ($taskname) {
-    $task = local_queue_crontask($taskname);
+if ($taskid) {
+    $task = local_queue_item_settings($taskid);
     if (!$task) {
         print_error('invaliddata');
     }
@@ -75,7 +75,7 @@ if ($mform && $mform->is_cancelled()) {
         }
     }
     if ($saved !== false) {
-        $msg = get_string('crontaskupdated', 'local_queue');
+        $msg = get_string('crontasksettingsupdated', 'local_queue');
         totara_set_notification($msg, new moodle_url('/local/queue/management/crontasks.php'), array('class' => 'notifysuccess'));
     }
 } else if ($action == 'edit') {
@@ -90,11 +90,11 @@ if ($mform && $mform->is_cancelled()) {
     if ($error) {
         echo $OUTPUT->notification($error, 'notifyerror');
     }
-    echo "<h3>".get_string('adhoctasks', 'local_queue')."</h3>";
+    echo "<h3>".get_string('othertasks', 'local_queue')."</h3>";
     echo $renderer->crontask_defaults_table();
 
-    echo "<h3>".get_string('scheduledtasks', 'tool_task')."</h3>";
-    $tasks = local_queue_crontasks();
-    echo $renderer->scheduled_tasks_table($tasks);
+    echo "<h3>".get_string('knowntasks', 'local_queue')."</h3>";
+    $tasks = local_queue_items_settings();
+    echo $renderer->known_tasks_table($tasks);
     echo $OUTPUT->footer();
 }

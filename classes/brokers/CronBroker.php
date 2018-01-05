@@ -25,6 +25,8 @@ namespace local_queue\brokers;
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot.'/local/queue/lib.php');
 require_once(LOCAL_QUEUE_FOLDER.'/interfaces/QueueBroker.php');
+require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
+use \local_queue\QueueLogger;
 
 
 class CronBroker implements \local_queue\interfaces\QueueBroker{
@@ -38,7 +40,7 @@ class CronBroker implements \local_queue\interfaces\QueueBroker{
         $record = $payload['record'];
         $this->classname = $classname;
         $this->type = local_queue_task_type_from_class($classname);
-        $this->record = local_queue_task_record($this->type, $record);
+        $this->record = local_queue_cron_task_record($this->type, $record);
     }
 
     public function get_task() {
@@ -49,9 +51,9 @@ class CronBroker implements \local_queue\interfaces\QueueBroker{
 
         $cronlockfactory = \core\lock\lock_config::get_lock_factory('cron');
         if (!$cronlock = $cronlockfactory->get_lock('core_cron', 5)) {
-            throw new \Exception('Cron is locked. Cannot continue.');
+            QueueLogger::error('Cron is locked. Cannot continue.');
         }
-        $unique = $this->classname.'_'.$this->record->id;
+        $unique = $this->classname. '_'. $this->record->id;
         if ($lock = $cronlockfactory->get_lock($unique, 1)) {
             if (!$this->task) {
                 $lock->release();
@@ -65,7 +67,7 @@ class CronBroker implements \local_queue\interfaces\QueueBroker{
             return $this->task;
         } else {
             $cronlock->release();
-            throw new \Exception('Task is locked. Cannot continue.');
+            QueueLogger::error('Task is locked. Cannot continue.');
         }
 
         $cronlock->release();

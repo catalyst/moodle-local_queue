@@ -36,18 +36,6 @@ class QueueManager {
      */
     private $wait;
     /**
-     * Time to wait before placing the worker in the background.
-     */
-    private $handletime;
-    /**
-     * Status - Doing foreground work?
-     */
-    private $working = false;
-    /**
-     * Execution - number of queue cycles.
-     */
-    private $cycles = 0;
-    /**
      * Execution - number of queue items handled.
      */
     private $executed = 0;
@@ -56,83 +44,27 @@ class QueueManager {
      */
     private $workers = [];
     /**
-     * Internal - backgrounded workers.
-     */
-    private $inbackground = [];
-    /**
-     * \local_queue\interfaces\Queue queue objects.
+     * Queue name to do work on.
      */
     private $queue;
 
-    public function __construct(\local_queue\interfaces\Queue $queue) {
+    /**
+     * @var \local_queue\interfaces\QueueService queue service objects.
+     */
+    private $queueservice;
+
+    public function __construct($queue) {
         $this->queue = $queue;
-        gc_collect_cycles();
-        gc_disable();
     }
 
     /**
      * Load the plugin configuration for any changes.
      */
     public function load_configuration() {
-        $defaults = local_queue_defaults();
+        $defaults = local_queue_configuration();
         $this->maxworkers = $defaults['pipesnumber'];
-        $this->handletime = $defaults['handletime'];
         $this->wait = $defaults['waittime'];
-    }
-
-    /**
-     * Handle the current foregrounded workers, or move them to the background.
-     */
-    public function foreground() {
-        $color = QueueLogger::GREEN;
-        QueueLogger::systemlog(" ... Foreground work started ... ", $color);
-        while (count($this->workers) > 0) {
-            $this->working = true;
-            $worker = array_shift($this->workers);
-            $pid = $worker->pid;
-            $primetime = $worker->starttime + $this->handletime;
-            while ($primetime > time()) {
-                if (!$worker->running()) {
-                    break;
-                }
-                sleep(1);
-            }
-            if ($worker->running()) {
-                $this->inbackground[$worker->hash] = $worker;
-                $action = 'move to background';
-                QueueLogger::systemlog(" --- [$pid] Worker '$worker->hash' $action. ", $color);
-                continue;
-            } else {
-                $this->results($worker, $color);
-                unset($worker);
-            }
-        }
-        QueueLogger::systemlog(" ... Foreground work ended ... ", $color);
-        $this->working = false;
-        gc_collect_cycles();
-        gc_disable();
-    }
-
-    /**
-     * Handle the current backgrounded workers if they're finished, or skip.
-     */
-    public function background() {
-        $color = QueueLogger::BLUE;
-        QueueLogger::systemlog(" ... Background work started ... ", $color);
-        foreach ($this->inbackground as $worker) {
-            $pid = $worker->pid;
-            if ($worker->running()) {
-                QueueLogger::systemlog(" --- [$pid] Worker '$worker->hash' still running --- ", $color);
-                continue;
-            } else {
-                unset($this->inbackground[$worker->hash]);
-                $this->results($worker, $color);
-                unset($worker);
-            }
-        }
-        QueueLogger::systemlog(" ... Background work ended ... ", $color);
-        gc_collect_cycles();
-        gc_disable();
+        $this->queueservice = $defaults['mainqueueservice'];
     }
 
     /**
@@ -141,49 +73,58 @@ class QueueManager {
      * @param string $color color string of the mechanics output.
      */
     public function results(\local_queue\interfaces\QueueWorker $worker, $color) {
-        $pid = $worker->pid;
+        $result = [];
+        $result['pid'] = $worker->pid;
+        $result['hash'] = $worker->hash;
         $report = $worker->get_report();
-        $item = $worker->get_item();
-        $action = $report['action'];
+        $result['item'] = $worker->get_item();
         $worker->finish();
-        $this->queue->$action($item);
-        $this->executed++;
-        QueueLogger::systemlog(" ---> [$pid] Worker '$worker->hash' Start", $color);
-        QueueLogger::systemlog(" ---> ITEM: $item->id.", $color);
-        QueueLogger::systemlog(" ---> PAYLOAD: $item->payload.", $color);
-        QueueLogger::systemlog(" ---> ACTION: $action.", $color);
-        QueueLogger::systemlog(" ---> OUTPUT: ", $color);
-        QueueLogger::read($worker->outputfile, $worker->hash);
+        unset($worker);
+        $result['action'] = $report['action'];
+        $result['outputfile'] = $report['output'];
+        $result['errorfile'] = $report['error'];
+        $result['failed'] = $report['failed'];
+        unset($report);
+        QueueLogger::systemlog(" ---> [".$result['pid']."] Worker '".$result['hash']."' Start", $color);
+        QueueLogger::systemlog(' ---> ITEM: '.$result['item']->id, $color);
+        QueueLogger::systemlog(' ---> PAYLOAD: '.$result['item']->payload, $color);
+        QueueLogger::systemlog(' ---> ACTION: '.$result['action'], $color);
+        QueueLogger::systemlog(' ---> OUTPUT: ', $color);
+        QueueLogger::read($result['outputfile'], $result['hash']);
         QueueLogger::log('');
-        if ($worker->failed) {
+        if ($result['failed']) {
             QueueLogger::systemlog(" ---> ERROR: ", $color);
-            QueueLogger::read($worker->errorfile, $worker->hash);
+            QueueLogger::read($result['errorfile'], $result['hash']);
             QueueLogger::log('');
         }
-        QueueLogger::systemlog(" ---> [$pid] Worker '$worker->hash' End", $color);
-        QueueLogger::systemlog(" ... Executed: $this->executed", $color);
-        unset($worker);
+        QueueLogger::systemlog(" ---> [".$result['pid']."] Worker '".$result['hash']."' End", $color);
+        $this->executed++;
+        QueueLogger::systemlog(" ... Executed: $this->executed", QueueLogger::BLUE);
+        unset($color);
+        $service = $this->queueservice;
+        $service::{$result['action']}($result['item']);
+        unset($service);
+        unset($result);
         gc_collect_cycles();
         gc_disable();
     }
 
     /**
-     * Loadss the plugin configuration and pauses (for performance reasons) in betweet cycles or before checking the schedule.
+     * Loads the plugin configuration and pauses (for performance reasons) in betweet cycles or before checking the schedule.
      */
     public function work() {
         $color = QueueLogger::YELLOW;
         QueueLogger::systemlog(" ... Work started ... ", $color);
-        $pausetime = 1;
-        QueueLogger::systemlog(" ... Rechecking configuration ... ", $color);
+        QueueLogger::systemlog(" ... Loading configuration ... ", $color);
         $this->load_configuration();
         if (!$this->queueing()) {
             QueueLogger::systemlog(" ... Queue cycle ended ... ", $color);
-            $pausetime = $this->cycles == 0 ? $pausetime : $this->wait;
-            $this->cycles++;
+        } else {
+            QueueLogger::systemlog(' ... Pausing work for '.($this->wait / 1000000).' second(s) ... ', $color);
+            usleep($this->wait);
         }
-        QueueLogger::systemlog(" ... Pausing work for $pausetime second(s) ... ", $color);
-        sleep($pausetime);
-        QueueLogger::systemlog(" ... Resuming work... ", $color);
+        QueueLogger::systemlog(' ... Resuming work... ', $color);
+        unset($color);
         gc_collect_cycles();
         gc_disable();
         $this->schedule();
@@ -193,41 +134,68 @@ class QueueManager {
      * Consumes items from the queue and routes the next step (foreground or background work) based upon the workload status.
      */
     public function schedule() {
+        if ($this->used() > 0) {
+            $this->process();
+        }
         $color = QueueLogger::PURPLE;
-        $used = $this->used();
-        QueueLogger::systemlog(" ... Checking schedule ... ", $color);
-        QueueLogger::systemlog(" ... Workers used: $used ... ", $color);
-        $slots = $this->maxworkers - $used;
+        QueueLogger::systemlog(' ... Checking schedule ... ', $color);
+        QueueLogger::systemlog(' ... Workers used: '.$this->used().' ... ', $color);
+        $slots = $this->maxworkers - $this->used();
         QueueLogger::systemlog(" ... Available slots: $slots ... ", $color);
-        QueueLogger::systemlog(" ... In background: ".count($this->inbackground). " ... ", $color);
+        unset($color);
         gc_collect_cycles();
         gc_disable();
         if ($slots > 0) {
-            $items = $this->queue->consume($slots);
+            $service = $this->queueservice;
+            $items = $service::consume($slots, $this->queue);
+            unset($service);
+            unset($slots);
             foreach ($items as $item) {
                 $this->new_worker($item);
+                unset($item);
             }
-            if (!$this->working && count($this->workers) > 0) {
-                $this->foreground();
-            }
+            unset($items);
         }
-        if (count($this->inbackground) > 0) {
-            $this->background();
-        }
+        gc_collect_cycles();
+        gc_disable();
     }
 
     /**
-     * Check if there are any running workers either in the foreground or the background.
+     * Handle the current backgrounded workers if they're finished, or skip.
+     */
+    public function process() {
+        $color = QueueLogger::GREEN;
+        QueueLogger::systemlog(' ... Processing started ... ', $color);
+        foreach ($this->workers as $worker) {
+            $pid = $worker->pid;
+            if ($worker->running()) {
+                QueueLogger::systemlog(" --- [$pid] Worker '$worker->hash' still running --- ", $color);
+                continue;
+            } else {
+                unset($this->workers[$worker->hash]);
+                $this->results($worker, $color);
+                unset($worker);
+            }
+            unset($pid);
+        }
+        QueueLogger::systemlog(' ... Processing ended ... ', $color);
+        unset($color);
+        gc_collect_cycles();
+        gc_disable();
+    }
+
+    /**
+     * Check if there are any running workers.
      */
     public function queueing() {
-        return count($this->workers) > 0 || count($this->inbackground) > 0;
+        return $this->used() > 0;
     }
 
     /**
-     * Get the total number of running workers in both the foreground and the background.
+     * Get the total number of running workers.
      */
     public function used() {
-        return count($this->workers) + count($this->inbackground);
+        return count($this->workers);
     }
 
     /**
@@ -236,13 +204,14 @@ class QueueManager {
      */
     public function new_worker($item) {
         $workerclass = $item->worker;
-        local_queue_class_loader(QUEUE_WORKERS_FOLDER, $workerclass);
-        $worker = new $workerclass();
-        $worker->set_item($item);
-        $worker->begin();
-        $this->workers[$worker->hash] = $worker;
-        unset($worker);
-        gc_collect_cycles();
-        gc_disable();
+        if (class_exists($workerclass)) {
+            $worker = new $workerclass();
+            unset($workerclass);
+            $worker->set_item($item);
+            unset($item);
+            $worker->begin();
+            $this->workers[$worker->hash] = $worker;
+            unset($worker);
+        }
     }
 }

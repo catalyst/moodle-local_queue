@@ -71,7 +71,7 @@ class edit_queue_cron_task_form extends \moodleform {
         $mform->addElement('select', 'container', $croncontainer, $containeroptions);
 
         // The default cron job class.
-        $types = ['\local_queue\jobs\BaseCronJob'];
+        $types = ['\local_queue\jobs\BaseCronJob', '\local_queue\interfaces\QueueJob'];
         $folder = QUEUE_JOBS_FOLDER;
         $jobs = local_queue_class_scanner($folder, $types);
         $joboptions = [];
@@ -101,8 +101,7 @@ class edit_queue_cron_task_form extends \moodleform {
 
     public function save($data) {
         $data->id = $data->task;
-        $table = 'local_queue_tasks';
-        return save_update_queue_data($data, $table);
+        return \local_queue\QueueItemHelper::save_update_item_settings($data);
     }
 
 }

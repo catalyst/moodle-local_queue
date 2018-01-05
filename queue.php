@@ -26,17 +26,25 @@ define('CLI_SCRIPT', true);
 
 require(dirname(dirname(dirname(__FILE__))).'/config.php');
 require_once($CFG->dirroot.'/local/queue/classes/QueueManager.php');
-require_once($CFG->dirroot.'/local/queue/classes/queues/CronDatabaseQueue.php');
 
-$time = time();
+if ($argc < 2) {
+    QueueLogger::error('Invalid number of arguments provided');
+}
+$queue = 'cron';
+if (isset($argv[1])) {
+    $queue = $argv[1];
+}
+
 // Requeue orphan items from the previous run of the manager (if the process got terminated).
-local_queue_requeue_orphans($time);
-$unlink = !local_queue_defaults('keeplogs');
+$time = time();
+$queueservice = local_queue_configuration('mainqueueservice');
+$queueservice::requeue_orphans($time, $queue);
+// If not keeping logs, remove the logs folder and all the contents (from previous orphans).
+$unlink = !local_queue_configuration('keeplogs');
 if ($unlink) {
-    // If not keeping logs, remove the logs folder and all the contents (from previous orphans).
     local_queue_rm_local_dir('logs');
 }
-$manager = new QueueManager(new queues\CronDatabaseQueue());
+$manager = new QueueManager($queue);
 while (true) {
     $manager->work();
 }

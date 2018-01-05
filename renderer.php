@@ -26,7 +26,7 @@ require_once($CFG->dirroot . '/local/queue/lib.php');
 
 class local_queue_renderer extends plugin_renderer_base {
 
-    public function scheduled_tasks_table($tasks) {
+    public function known_tasks_table($tasks) {
         $cronurl = '/local/queue/management/crontasks.php';
         $table = new html_table();
         $table->head  = array(
@@ -43,32 +43,33 @@ class local_queue_renderer extends plugin_renderer_base {
         $priority = get_string('priority', 'local_queue');
         $attempts = get_string('attempts', 'local_queue');
         foreach ($tasks as $task) {
-            $configureurl = new moodle_url($cronurl, array('action' => 'edit', 'task' => $task['id']));
-            $editlink = $this->action_icon($configureurl, new pix_icon('t/edit', $task['name']));
-            $name = new html_table_cell(html_writer::tag('b', $task['name']). "<br/><br/>".'('.$task['classname'].')');
+            $configureurl = new moodle_url($cronurl, array('action' => 'edit', 'task' => $task->id));
+            $task->name = local_queue_task_name($task->classname);
+            $editlink = $this->action_icon($configureurl, new pix_icon('t/edit', $task->name));
+            $name = new html_table_cell(html_writer::tag('b', $task->name). "<br/><br/>".'('.$task->classname.')');
             $details = new html_table_cell(
                 html_writer::tag(
                     'span',
-                    html_writer::tag('b', $worker. ': '). local_queue_extract_classname($task['worker'])
+                    html_writer::tag('b', $worker. ': '). local_queue_extract_classname($task->worker)
                 ). "<br/>".
                 html_writer::tag(
                     'span',
-                    html_writer::tag('b', $broker. ': '). local_queue_extract_classname($task['broker'])
+                    html_writer::tag('b', $broker. ': '). local_queue_extract_classname($task->broker)
                 ). "<br/>".
                 html_writer::tag(
                     'span',
-                    html_writer::tag('b', $container. ': '). local_queue_extract_classname($task['container'])
+                    html_writer::tag('b', $container. ': '). local_queue_extract_classname($task->container)
                 ). "<br/>".
                 html_writer::tag(
                     'span',
-                    html_writer::tag('b', $job. ': '). local_queue_extract_classname($task['job'])
+                    html_writer::tag('b', $job. ': '). local_queue_extract_classname($task->job)
                 ). "<br/>".
                 html_writer::tag(
                     'span',
-                    html_writer::tag('b', $priority. ': '). $task['priority']
+                    html_writer::tag('b', $priority. ': '). $task->priority
                 ).' '.
                 html_writer::tag('span',
-                    html_writer::tag('b', $attempts. ': '). $task['attempts']
+                    html_writer::tag('b', $attempts. ': '). $task->attempts
                 )
             );
             $rowitems = array($name, $details, new html_table_cell($editlink));
@@ -93,7 +94,7 @@ class local_queue_renderer extends plugin_renderer_base {
         $job = get_string('job', 'local_queue');
         $priority = get_string('priority', 'local_queue');
         $attempts = get_string('attempts', 'local_queue');
-        $defaults = local_queue_defaults();
+        $defaults = \local_queue\QueueItemHelper::queue_item_defaults('cron');
         $configureurl = new moodle_url('/admin/settings.php?section=local_queue_generalsettings');
         $editlink = $this->action_icon($configureurl, new pix_icon('t/edit', get_string('crondefaults', 'local_queue')));
         $name = new html_table_cell($taskdefaults);
@@ -101,15 +102,15 @@ class local_queue_renderer extends plugin_renderer_base {
         $details = new html_table_cell(
             html_writer::tag(
                 'span',
-                html_writer::tag('b', $worker. ': '). local_queue_extract_classname($defaults['cronworker'])
+                html_writer::tag('b', $worker. ': '). local_queue_extract_classname($defaults['worker'])
             ). "<br/>".
             html_writer::tag(
                 'span',
-                html_writer::tag('b', $container. ': '). local_queue_extract_classname($defaults['croncontainer'])
+                html_writer::tag('b', $container. ': '). local_queue_extract_classname($defaults['container'])
             ). "<br/>".
             html_writer::tag(
                 'span',
-                html_writer::tag('b', $job. ': '). local_queue_extract_classname($defaults['cronjob'])
+                html_writer::tag('b', $job. ': '). local_queue_extract_classname($defaults['job'])
             ). "<br/>".
             html_writer::tag(
                 'span',

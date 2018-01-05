@@ -23,37 +23,29 @@
 namespace local_queue\jobs;
 
 defined('MOODLE_INTERNAL') || die();
-require_once(dirname(__FILE__).'/BaseCronJob.php');
+require_once($CFG->dirroot.'/local/queue/lib.php');
+require_once(LOCAL_QUEUE_FOLDER.'/interfaces/QueueJob.php');
 require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
 use \local_queue\QueueLogger;
 
-class SilentCronJob extends \local_queue\jobs\BaseCronJob {
+class DefaultJob implements \local_queue\interfaces\QueueJob {
     private $task;
 
     public function __construct(\core\task\task_base $task) {
         $this->task = $task;
+        if (!method_exists($this->task, 'execute')) {
+            QueueLogger::error("\n".'Task invalid.'."\n".' Does not have the required method (execute).');
+        }
     }
 
     public function start() {
-        parent::prepare();
-        QueueLogger::systemlog("");
+        QueueLogger::systemlog('Task to be executed: '. $this->task->get_name()."\n");
         try {
-            get_mailer('buffer');
             $this->task->execute();
-            $this->success();
+            QueueLogger::systemlog("\n".'Task execution status: success.');
         } catch (Exception $e) {
-            $this->failed($e);
+            QueueLogger::error("\n".'Task execution status: failed.'."\n".' Reason: ' . $e->getMessage());
         }
-        parent::finish();
-    }
-
-    public function failed($exception) {
-        parent::failed($exception);
-        parent::manage($this->task, 'failed');
-    }
-
-    public function success() {
-        parent::success();
-        parent::manage($this->task, 'complete');
+        QueueLogger::systemlog("End Time: ".date('r', time()));
     }
 }

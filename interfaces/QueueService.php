@@ -30,4 +30,5 @@ interface QueueService {
     public static function ack($item);
     public static function nack($item);
     public static function ban($item);
+    public static function item_info($hash);
 }

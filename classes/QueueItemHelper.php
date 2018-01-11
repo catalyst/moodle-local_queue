@@ -73,20 +73,6 @@ class QueueItemHelper {
     }
 
     /**
-     * Get queue item record by hash.
-     *
-     * @param string $hash queue item hash
-     * @return stdClass|false
-     */
-    private static function get_item_by_hash($hash) {
-        global $DB;
-
-        $where = 'hash = :hash';
-        $params = ['hash' => $hash];
-        return $DB->get_record_select(QUEUE_ITEMS_TABLE, $where, $params, '*', IGNORE_MISSING);
-    }
-
-    /**
      * Get queue item settings record by classname.
      *
      * @param string $classname queue item settings classname
@@ -177,7 +163,8 @@ class QueueItemHelper {
         $classname = self::extract_property($data, 'classname');
         $id = self::extract_property($data, 'id');
         $hash = stripslashes($classname). '_'. $id;
-        $item = self::get_item_by_hash($hash);
+        $queueservice = local_queue_configuration('mainqueueservice');
+        $item = $queueservice::item_info($hash);
         $settings = self::item_settings_data($classname, $queue);
         if (!$item) {
             $item = new \stdClass();

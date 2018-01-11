@@ -113,6 +113,20 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
     }
 
     /**
+     * Get queue item record by hash, without removing it from the queue.
+     *
+     * @param string $hash queue item hash
+     * @return stdClass|false
+     */
+    public static function item_info($hash) {
+        global $DB;
+
+        $where = 'hash = :hash';
+        $params = ['hash' => $hash];
+        return $DB->get_record_select(QUEUE_ITEMS_TABLE, $where, $params, '*', IGNORE_MISSING);
+    }
+
+    /**
      * Re-queue any orphan items that were stuck in running mode if the manager crashed.
      * @param int $time start time of a new manger.
      * @param string $queue the name of the queue. Default null.

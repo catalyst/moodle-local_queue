@@ -245,8 +245,6 @@ function local_queue_rm_local_dir($dir) {
  * @return array|string.
  */
 function local_queue_configuration($wanted = null) {
-    $cache = \cache::make('core', 'config');
-    $cache->purge();
     $defaults = [
         'mechanics' => true,
         'keeplogs' => false,
@@ -289,6 +287,22 @@ function local_queue_configuration($wanted = null) {
         return $defaults[$wanted];
     }
     return $defaults;
+}
+
+/**
+ * Refresh the plugin's configuration if different from cached verion.
+ *
+ */
+function refresh_configuration() {
+    global $DB;
+
+    $cache = \cache::make('core', 'config');
+    $plugin = 'local_queue';
+    $result = $DB->get_records_menu('config_plugins', array('plugin' => $plugin), '', 'name,value');    
+    $cachedresult = $cache->get($plugin);
+    if ($result != $cachedresult){
+        $cache->set($plugin, $result);
+    }
 }
 
 /**

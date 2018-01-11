@@ -61,6 +61,7 @@ class QueueManager {
      * Load the plugin configuration for any changes.
      */
     public function load_configuration() {
+        refresh_configuration();
         $defaults = local_queue_configuration();
         $this->maxworkers = $defaults['pipesnumber'];
         $this->wait = $defaults['waittime'];
@@ -139,9 +140,10 @@ class QueueManager {
         }
         $color = QueueLogger::PURPLE;
         QueueLogger::systemlog(' ... Checking schedule ... ', $color);
-        QueueLogger::systemlog(' ... Workers used: '.$this->used().' ... ', $color);
+        QueueLogger::systemlog(' ... Total Workers: '.$this->maxworkers.' ... ', $color);
+        QueueLogger::systemlog(' ... Busy Workers: '.$this->used().' ... ', $color);
         $slots = $this->maxworkers - $this->used();
-        QueueLogger::systemlog(" ... Available slots: $slots ... ", $color);
+        QueueLogger::systemlog(" ... Free Workers: $slots ... ", $color);
         unset($color);
         gc_collect_cycles();
         gc_disable();

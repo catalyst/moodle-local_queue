@@ -29,6 +29,7 @@ require_once(LOCAL_QUEUE_FOLDER.'/classes/QueueLogger.php');
 use \local_queue\QueueLogger;
 
 class DatabaseQueueService implements \local_queue\interfaces\QueueService {
+    private static $color = QueueLogger::RED;
 
     /**
      * Retrieve a number of items from the queue.
@@ -39,7 +40,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
     public static function consume($limit = 1, $queue = null) {
         global $DB;
 
-        QueueLogger::systemlog(" ... Requested pool items: ". $limit);
+        QueueLogger::systemlog(" ... Requested pool items: ". $limit, self::$color);
         $conditions = ['banned' => false, 'running' => false];
         if ($queue) {
             $conditions['queue'] = $queue;
@@ -57,7 +58,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
             $DB->set_field_select(QUEUE_ITEMS_TABLE, 'timechanged', time(), $sql, $params);
             $DB->set_field_select(QUEUE_ITEMS_TABLE, 'timestarted', time(), $sql, $params);
         }
-        QueueLogger::systemlog(" ... Loaded from pool: ". count($items));
+        QueueLogger::systemlog(" ... Loaded from pool: ". count($items), self::$color);
         return $items;
     }
 
@@ -70,7 +71,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
         $item->timecreated = time();
         $item->queue = $queue;
         $id = self::save_update_queue_item($item);
-        QueueLogger::systemlog(" ... Published item '". $item->hash. "' - ID ". $id);
+        QueueLogger::systemlog(" ... Published item '". $item->hash. "' - ID ". $id, self::$color);
     }
 
     /**
@@ -84,7 +85,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
         } else {
             self::save_update_queue_item($item);
         }
-        QueueLogger::systemlog(" ... Closure for item: '". $item->hash. "' - ID ". $item->id);
+        QueueLogger::systemlog(" ... Closure for item: '". $item->hash. "' - ID ". $item->id, self::$color);
     }
 
     /**
@@ -95,7 +96,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
         $item->timecompleted = time();
         $item->timechanged = time();
         $id = self::save_update_queue_item($item);
-        QueueLogger::systemlog(" ... Requeued  item '". $item->hash. "' - ID ". $id);
+        QueueLogger::systemlog(" ... Requeued  item '". $item->hash. "' - ID ". $id, self::$color);
     }
 
     /**
@@ -109,7 +110,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
         $item->banned = true;
         $item->attempts = 0;
         $id = self::save_update_queue_item($item);
-        QueueLogger::systemlog(" ... Banned item '". $item->hash. "' - ID ". $id);
+        QueueLogger::systemlog(" ... Banned item '". $item->hash. "' - ID ". $id, self::$color);
     }
 
     /**

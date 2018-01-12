@@ -34,8 +34,8 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
      */
     private $specs = array(
        0 => array("pipe", "r"),
-       1 => array('file', 'logs/output/', 'w'),
-       2 => array('file', 'logs/errors/', 'w'),
+       1 => array('file', 'logs/output', 'w'),
+       2 => array('file', 'logs/errors', 'w'),
     );
     /**
      * Array containing the worker process pipes.
@@ -118,8 +118,8 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
 
         $php = PHP_BINARY;
         $dir = LOCAL_QUEUE_FOLDER;
-        if (!is_dir($dir.'/logs')) {
-            mkdir($dir.'/logs');
+        if (!is_dir($dir. '/logs')) {
+            mkdir($dir. '/logs');
         }
         $cwd = null;
         $env = array(
@@ -128,15 +128,15 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
             'broker' => $this->item->broker,
             'job' => $this->item->job
         );
-        $cmd = $php.' '. $dir.'/worker.php '.$this->item->hash;
+        $cmd = $php. ' '. $dir. '/worker.php '. $this->item->hash;
         if (PHP_OS == "Linux" && local_queue_configuration('usenice')) {
             $niceness = (4 * $this->item->priority) - 20;
             if ($niceness != 0) {
                 $nice = 'nice -n '. $niceness;
-                $cmd = $nice .' '. $cmd;
+                $cmd = $nice. ' '. $cmd;
             }
         }
-        $this->starttime = time();
+        $this->starttime = microtime(true);
         $specs = $this->specs;
         $outputdir = $dir. '/'. $specs[1][1];
         $errorsdir = $dir. '/'. $specs[2][1];
@@ -146,7 +146,7 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
         if (!is_dir($errorsdir)) {
             mkdir($errorsdir);
         }
-        $taskdir = '/'.$this->item->hash. '/';
+        $taskdir = '/'. $this->item->hash. '/';
         if (!is_dir($outputdir. $taskdir)) {
             mkdir($outputdir. $taskdir);
         }

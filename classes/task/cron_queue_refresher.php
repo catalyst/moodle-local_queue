@@ -50,7 +50,7 @@ class cron_queue_refresher extends \core\task\scheduled_task {
         $lastrun = $this->get_last_run_time();
         $nextrun = $this->get_next_scheduled_time();
         $sql = '
-        SELECT task
+        SELECT *
         FROM (
             SELECT ts.id, ts.classname,
              (CASE ts.nextruntime WHEN NULL THEN :now1 ELSE ts.nextruntime END) AS runtime
@@ -70,9 +70,7 @@ class cron_queue_refresher extends \core\task\scheduled_task {
         $keys = ['id', 'classname', 'nextruntime'];
         $found = count($records);
         $queueservice = local_queue_configuration('mainqueueservice');
-        foreach ($records as $key => $value) {
-            $record = (object) array_combine($keys, explode(',', substr($value->task, 1, -1)));
-            $record->classname = stripslashes(substr($record->classname, 1, -1));
+        foreach ($records as $key => $record) {
             $item = QueueItemHelper::prepare_queue_item($record, 'cron');
             $queueservice::publish($item, 'cron');
             unset($item);

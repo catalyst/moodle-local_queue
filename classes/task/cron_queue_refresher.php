@@ -52,14 +52,14 @@ class cron_queue_refresher extends \core\task\scheduled_task {
         $sql = '
         SELECT *
         FROM (
-            SELECT ts.id, ts.classname,
+            SELECT CONCAT("scheduled", ts.id) as qid, ts.id, ts.classname,
              (CASE ts.nextruntime WHEN NULL THEN :now1 ELSE ts.nextruntime END) AS runtime
             FROM {task_scheduled} ts
             WHERE (ts.lastruntime IS NULL OR ts.lastruntime <= :lr)
             AND (ts.nextruntime IS NULL OR ts.nextruntime <= :nr1)
             AND ts.disabled = 0
             UNION ALL
-            SELECT ta.id, ta.classname,
+            SELECT CONCAT("adhoc", ta.id) as qid, ta.id, ta.classname,
              (CASE ta.nextruntime WHEN NULL THEN :now2 ELSE ta.nextruntime END) AS runtime
             FROM {task_adhoc} ta
             WHERE (ta.nextruntime IS NULL OR ta.nextruntime <= :nr2)

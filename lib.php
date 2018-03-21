@@ -222,7 +222,9 @@ function local_queue_is_empty_dir($folder) {
  * @param string $dir directory string.
  */
 function local_queue_rm_local_dir($dir) {
-    $folder = LOCAL_QUEUE_FOLDER.DIRECTORY_SEPARATOR.$dir;
+    global $CFG;
+
+    $folder = $CFG->localcachedir. DIRECTORY_SEPARATOR.$dir;
     if (is_dir($folder)) {
         $files = scandir($folder);
         foreach ($files as $key => $value) {

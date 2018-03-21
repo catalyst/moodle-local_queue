@@ -181,6 +181,7 @@ class QueueItemHelper {
         } else {
             if ($item->attempts > $settings->attempts || $settings->special == true) {
                 $item->attempts = $settings->attempts;
+                $item->banned = false;
             }
         }
         $item->container = $settings->container;

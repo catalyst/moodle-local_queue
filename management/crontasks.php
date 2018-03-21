@@ -75,8 +75,8 @@ if ($mform && $mform->is_cancelled()) {
         }
     }
     if ($saved !== false) {
-        $msg = get_string('crontasksettingsupdated', 'local_queue');
-        totara_set_notification($msg, new moodle_url('/local/queue/management/crontasks.php'), array('class' => 'notifysuccess'));
+        $msg = get_string('crontasksettingsupdated', 'local_queue');        
+        redirect(new moodle_url('/local/queue/management/crontasks.php'), $msg, 1);
     }
 } else if ($action == 'edit') {
     echo $OUTPUT->header();

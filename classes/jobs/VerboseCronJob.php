@@ -44,7 +44,7 @@ class VerboseCronJob extends \local_queue\jobs\BaseCronJob {
             get_mailer('buffer');
             $this->task->execute();
             $this->success();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->failed($e);
         }
         $this->finish();

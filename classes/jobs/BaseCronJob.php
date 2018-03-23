@@ -42,7 +42,7 @@ abstract class BaseCronJob implements \local_queue\interfaces\QueueJob {
             get_mailer('buffer');
             $this->task->execute();
             $this->success();
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $this->failed($e);
         }
         $this->finish();
@@ -52,11 +52,11 @@ abstract class BaseCronJob implements \local_queue\interfaces\QueueJob {
         global $DB, $CFG;
 
         if (CLI_MAINTENANCE) {
-            throw new Exception('CLI maintenance mode active, cron execution suspended.');
+            throw new \Exception('CLI maintenance mode active, cron execution suspended.');
         }
 
         if (moodle_needs_upgrading()) {
-            throw new Exception('Moodle upgrade pending, cron execution suspended.');
+            throw new \Exception('Moodle upgrade pending, cron execution suspended.');
         }
 
         require_once($CFG->libdir.'/adminlib.php');

@@ -39,7 +39,7 @@ class QueueLogger {
         if (local_queue_configuration('mechanics')) {
             if (defined('STDOUT')) {
                 if (posix_isatty(STDOUT)) {
-                    self::log($color. ' '. $message.$ce);
+                    self::log($color. ' '. $message. $ce);
                 } else {
                     self::log($message);
                 }
@@ -49,11 +49,12 @@ class QueueLogger {
         }
     }
 
-    public static function log($message) {
+    public static function log($message, $eol = PHP_EOL) {
+        $timestamp = date("Y-m-d H:i:s");
         if (defined('STDOUT')) {
-            fwrite(STDOUT, $message.PHP_EOL);
+            fwrite(STDOUT, $timestamp. ' '. $message. $eol);
         } else {
-            echo $message.PHP_EOL;
+            echo $timestamp. ' '. $message. $eol;
         }
     }
 
@@ -67,12 +68,7 @@ class QueueLogger {
         if ($outputpipe = fopen($filename, 'r')) {
             while (!feof($outputpipe)) {
                 $output = $hash. ' '. fgets($outputpipe);
-                if (defined('STDOUT') and !PHPUNIT_TEST) {
-                    fwrite(STDOUT, $output);
-                } else {
-                    echo $output;
-                }
-                flush();
+                self::log($output, '');
             }
             fclose($outputpipe);
             if ($unlink) {

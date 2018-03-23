@@ -147,7 +147,8 @@ class QueueManager {
         unset($color);
         gc_collect_cycles();
         gc_disable();
-        if ($slots > 0) {
+        $maintenance = CLI_MAINTENANCE || moodle_needs_upgrading();
+        if (!$maintenance && $slots > 0) {
             $service = $this->queueservice;
             $items = $service::consume($slots, $this->queue);
             unset($service);

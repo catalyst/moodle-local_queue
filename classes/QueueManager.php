@@ -90,13 +90,14 @@ class QueueManager {
         QueueLogger::systemlog(' ---> ITEM: '.$result['item']->id, $color);
         QueueLogger::systemlog(' ---> PAYLOAD: '.$result['item']->payload, $color);
         QueueLogger::systemlog(' ---> ACTION: '.$result['action'], $color);
-        QueueLogger::systemlog(' ---> OUTPUT: ', $color);
-        QueueLogger::read($result['outputfile'], $result['hash']);
-        QueueLogger::log('');
-        if ($result['failed']) {
+        $outputsize = filesize($result['outputfile']);        
+        if ($outputsize > 0) {
+            QueueLogger::systemlog(' ---> OUTPUT: ', $color);
+            QueueLogger::read($result['outputfile'], $result['hash']);
+        }
+        if ($result['failed'] && filesize($result['errorfile']) > 0) {
             QueueLogger::systemlog(" ---> ERROR: ", $color);
             QueueLogger::read($result['errorfile'], $result['hash']);
-            QueueLogger::log('');
         }
         QueueLogger::systemlog(" ---> [".$result['pid']."] Worker '".$result['hash']."' End", $color);
         $this->executed++;

@@ -76,6 +76,6 @@ class cron_queue_refresher extends \core\task\scheduled_task {
             unset($item);
             unset($records[$key]);
         }
-        echo " $found Queue item(s) refreshed. ";
+        echo " $found Queue item(s) refreshed. ". PHP_EOL;
     }
 }

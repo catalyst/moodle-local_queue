@@ -153,7 +153,9 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
     private static function save_update_queue_item(\stdClass $item) {
         global $DB;
         if (property_exists($item, 'id')) {
-            $item->timechanged = time();
+            if (!$item->banned) {
+                $item->timechanged = time();
+            }
             $DB->update_record(QUEUE_ITEMS_TABLE, $item);
             return $item->id;
         } else {

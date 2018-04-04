@@ -36,9 +36,9 @@ abstract class BaseCronJob implements \local_queue\interfaces\QueueJob {
     }
 
     public function start() {
-        $this->prepare();
         QueueLogger::systemlog('Task to be executed: '. $this->task->get_name()."\n");
         try {
+            $this->prepare();
             get_mailer('buffer');
             $this->task->execute();
             $this->success();

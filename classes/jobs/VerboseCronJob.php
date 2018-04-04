@@ -38,9 +38,9 @@ class VerboseCronJob extends \local_queue\jobs\BaseCronJob {
     }
 
     public function start() {
-        $this->prepare();
         QueueLogger::systemlog('Task to be executed: '. $this->task->get_name()."\n");
         try {
+            $this->prepare();
             get_mailer('buffer');
             $this->task->execute();
             $this->success();

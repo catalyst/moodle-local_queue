@@ -46,5 +46,10 @@ if ($unlink) {
 }
 $manager = new QueueManager($queue);
 while (true) {
-    $manager->work();
+    $maintenance = CLI_MAINTENANCE || moodle_needs_upgrading();
+    if (!$maintenance) {
+        $manager->work();
+    } else {
+    	sleep(10);
+    }
 }

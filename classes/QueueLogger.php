@@ -49,12 +49,14 @@ class QueueLogger {
         }
     }
 
-    public static function log($message, $eol = PHP_EOL) {
-        $timestamp = date("Y-m-d H:i:s");
+    public static function log($message, $eol = PHP_EOL, $timestamp = null) {
+        if ($timestamp != null) {
+            $message = $timestamp. ' '. $message;
+        }
         if (defined('STDOUT')) {
-            fwrite(STDOUT, $timestamp. ' '. $message. $eol);
+            fwrite(STDOUT, $message. $eol);
         } else {
-            echo $timestamp. ' '. $message. $eol;
+            echo $message. $eol;
         }
     }
 
@@ -67,8 +69,11 @@ class QueueLogger {
         $unlink = !local_queue_configuration('keeplogs');
         if ($outputpipe = fopen($filename, 'r')) {
             while (!feof($outputpipe)) {
-                $output = $hash. ' '. fgets($outputpipe);
-                self::log($output, '');
+                $line = fgets($outputpipe);
+                if ($line) {
+                    $output = $hash. ' '. $line;
+                    self::log($output, '', date("Y-m-d H:i:s"));
+                }
             }
             fclose($outputpipe);
             if ($unlink) {

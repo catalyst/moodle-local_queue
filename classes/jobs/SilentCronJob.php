@@ -35,9 +35,8 @@ class SilentCronJob extends \local_queue\jobs\BaseCronJob {
     }
 
     public function start() {
-        parent::prepare();
-        QueueLogger::systemlog("");
         try {
+            parent::prepare();
             get_mailer('buffer');
             $this->task->execute();
             $this->success();

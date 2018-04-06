@@ -300,9 +300,9 @@ function refresh_configuration() {
 
     $cache = \cache::make('core', 'config');
     $plugin = 'local_queue';
-    $result = $DB->get_records_menu('config_plugins', array('plugin' => $plugin), '', 'name,value');    
+    $result = $DB->get_records_menu('config_plugins', array('plugin' => $plugin), '', 'name,value');
     $cachedresult = $cache->get($plugin);
-    if ($result != $cachedresult){
+    if ($result != $cachedresult) {
         $cache->set($plugin, $result);
     }
 }

@@ -90,7 +90,7 @@ class QueueManager {
         QueueLogger::systemlog(' ---> ITEM: '.$result['item']->id, $color);
         QueueLogger::systemlog(' ---> PAYLOAD: '.$result['item']->payload, $color);
         QueueLogger::systemlog(' ---> ACTION: '.$result['action'], $color);
-        $outputsize = filesize($result['outputfile']);        
+        $outputsize = filesize($result['outputfile']);
         if ($outputsize > 0) {
             QueueLogger::systemlog(' ---> OUTPUT: ', $color);
             QueueLogger::read($result['outputfile'], $result['hash']);
@@ -189,6 +189,57 @@ class QueueManager {
     }
 
     /**
+     * Hard Break - terminate currently running workers signal, stop and report.
+     * @param string $error The signal specific error message.
+     * @param int $signal The received signal code.
+     */
+    public function hard_break($error, $signal) {
+        $color = QueueLogger::LRED;
+        $active = $this->used();
+        $prefix = '["'. $this->queue.'" queue manager]';
+        QueueLogger::log($prefix. ' Hard break started.', PHP_EOL, date("Y-m-d H:i:s"));
+        QueueLogger::log($prefix. ' Active Workers found: '. $active, PHP_EOL, date("Y-m-d H:i:s"));
+        $start = microtime(1);
+        $killed = $finished = $stopped = 0;
+        foreach ($this->workers as $worker) {
+            $pid = $worker->pid;
+            if ($worker->running()) {
+                posix_kill($pid, $signal);
+                usleep(10000);
+                if ($worker->running()) {
+                    $worker->trigger_error($error);
+                    posix_kill($pid, SIGKILL);
+                    $killed++;
+                } else {
+                    $stopped++;
+                }
+            } else {
+                $finished++;
+            }
+            unset($this->workers[$worker->hash]);
+            $this->results($worker, $color);
+            unset($worker);
+            unset($pid);
+        }
+        $difftime = @microtime_diff($start, microtime());
+        QueueLogger::log($prefix. ' Hard break execution took '. $difftime. ' seconds.', PHP_EOL, date("Y-m-d H:i:s"));
+        $status = $finished. ' finished / '. $stopped. ' stopped / '. $killed. ' killed. (total '. $active. ')';
+        QueueLogger::log($prefix. ' Workers Exit Status: '. $status, PHP_EOL, date("Y-m-d H:i:s"));
+        QueueLogger::log($prefix. ' Hard break ended. ', PHP_EOL, date("Y-m-d H:i:s"));
+        unset($start);
+        unset($color);
+        unset($prefix);
+        unset($killed);
+        unset($active);
+        unset($stopped);
+        unset($finished);
+        unset($difftime);
+        unset($status);
+        gc_collect_cycles();
+        gc_disable();
+    }
+
+    /**
      * Check if there are any running workers.
      */
     public function queueing() {
@@ -216,6 +267,41 @@ class QueueManager {
             $worker->begin();
             $this->workers[$worker->hash] = $worker;
             unset($worker);
+        }
+    }
+
+    /**
+     * Signals received dispatcher - Handle the kill or other special signals.
+     * @param int $signal The received signal code.
+     */
+    public function dispatch($signal) {
+        $kills = [
+            SIGHUP => 'SIGHUP',
+            SIGINT => 'SIGINT',
+            SIGILL => 'SIGILL',
+            SIGABRT => 'SIGABRT',
+            SIGTERM => 'SIGTERM',
+            SIGQUIT => 'SIGQUIT',
+            SIGALRM => 'SIGALRM',
+            SIGTSTP => 'SIGTSTP'
+        ];
+        $special = [
+            SIGUSR1 => 'SIGUSR1',
+            SIGUSR2 => 'SIGUSR2'
+        ];
+        QueueLogger::log('');
+        $prefix = '["'. $this->queue.'" queue manager]';
+        if (isset($kills[$signal])) {
+            $message = "$prefix TERMINATION signal '$kills[$signal]' received ... Hard break triggered.";
+            QueueLogger::log($message, PHP_EOL, date("Y-m-d H:i:s"));
+            $this->hard_break($message, $signal);
+            exit;
+        } else if (isset($special[$signal])) {
+            $message = "$prefix SPECIAL signal '$special[$signal]' received ... Unhandled ... ";
+            QueueLogger::log($message, PHP_EOL, date("Y-m-d H:i:s"));
+        } else {
+            $message = "$prefix Caught OTHER signal '$signal' ... Ignoring it ... ";
+            QueueLogger::log($message, PHP_EOL, date("Y-m-d H:i:s"));
         }
     }
 }

@@ -75,7 +75,7 @@ if ($mform && $mform->is_cancelled()) {
         }
     }
     if ($saved !== false) {
-        $msg = get_string('crontasksettingsupdated', 'local_queue');        
+        $msg = get_string('crontasksettingsupdated', 'local_queue');
         redirect(new moodle_url('/local/queue/management/crontasks.php'), $msg, 1);
     }
 } else if ($action == 'edit') {

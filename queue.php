@@ -45,11 +45,21 @@ if ($unlink) {
     local_queue_rm_local_dir('logs');
 }
 $manager = new QueueManager($queue);
+// Signals handling.
+pcntl_signal_dispatch();
+declare(ticks = 1);
+// Capture all signals except SIGKILL and SIGSTOP.
+// The signals SIGKILL and SIGSTOP cannot be caught, blocked, or ignored.
+for ($i = 1; $i < 32; $i++) {
+    if (!in_array($i, [9, 17, 19, 23])) {
+        pcntl_signal($i, array($manager, "dispatch"));
+    }
+}
 while (true) {
     $maintenance = CLI_MAINTENANCE || moodle_needs_upgrading();
     if (!$maintenance) {
         $manager->work();
     } else {
-    	sleep(10);
+        sleep(10);
     }
 }

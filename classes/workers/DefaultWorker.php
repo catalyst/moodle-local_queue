@@ -131,7 +131,7 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
             'broker' => $this->item->broker,
             'job' => $this->item->job
         );
-        $cmd = $php. ' '. LOCAL_QUEUE_FOLDER. '/worker.php '. $this->item->hash;
+        $cmd = "exec ".$php. ' '. LOCAL_QUEUE_FOLDER. '/worker.php '. $this->item->hash;
         if (PHP_OS == "Linux" && local_queue_configuration('usenice')) {
             $niceness = (4 * $this->item->priority) - 20;
             if ($niceness != 0) {
@@ -190,6 +190,14 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
     public function running() {
         $status = $this->get_status();
         if (isset($status['running'])) {
+            if ($status['running'] == false) {
+                if ($status['signaled'] == true && $status['exitcode'] != 0 && $status['termsig'] != 0) {
+                    $this->trigger_error("TERMINATION signal '".$status['termsig']."' received ..." );
+                }
+                if ($status['stopped'] == true && $status['exitcode'] != 0 && $status['stopsig'] != 0) {
+                    $this->trigger_error("STOP signal '".$status['stopsig']."' received ..." );
+                }
+            }
             return $status['running'];
         }
         return false;
@@ -217,6 +225,14 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
         }
         $this->failed = $found;
         return $found;
+    }
+
+    /**
+     * Trigger a "fake" error. Not caused by the task, but by the system, no attempt penalty needed.
+     */
+    public function trigger_error($error) {
+        file_put_contents($this->errorfile, $error, FILE_APPEND | LOCK_EX);
+        $this->item->attempts++;
     }
 
     /**

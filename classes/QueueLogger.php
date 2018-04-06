@@ -33,6 +33,11 @@ class QueueLogger {
     const PURPLE = "\033[35m";
     const BLACK = "\033[0m";
     const RED = "\033[31m";
+    const LGREEN = "\033[1;32m";
+    const LBLUE = "\033[1;34m";
+    const LYELLOW = "\033[1;33m";
+    const LPURPLE = "\033[1;35m";
+    const LRED = "\033[1;31m";
 
     public static function systemlog($message, $color = self::BLACK) {
         $ce = self::BLACK;
@@ -75,6 +80,7 @@ class QueueLogger {
                     self::log($output, '', date("Y-m-d H:i:s"));
                 }
             }
+            self::log('');
             fclose($outputpipe);
             if ($unlink) {
                 @unlink($filename);

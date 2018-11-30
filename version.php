@@ -25,7 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2017110703;
+$plugin->version   = 2017110704;
 $plugin->requires  = 2014051209;
 $plugin->component = 'local_queue';
 $plugin->cron      = 1;

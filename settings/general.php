@@ -29,6 +29,16 @@ if ($hassiteconfig) {
     $queuesettings = get_string('generalsettings', $localqueue);
     $settings = new admin_settingpage('local_queue_generalsettings', $queuesettings);
 
+    // Master switch to enable or disable the system.
+    $enablequeue = get_string('enablequeue', $localqueue);
+    $enablequeuehelp = get_string('enablequeue_help', $localqueue);
+    $settings->add(new admin_setting_configcheckbox(
+        $localqueue. '/'. $localqueue. '_enabled',
+        $enablequeue,
+        $enablequeuehelp,
+        0
+    ));
+
     $queuemanagerdefaults = get_string('queuemanagerdefaults', $localqueue);
     $settings->add(new admin_setting_heading('queuemanagerdefaults', $queuemanagerdefaults, ''));
 

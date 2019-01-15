@@ -248,6 +248,7 @@ function local_queue_rm_local_dir($dir) {
  */
 function local_queue_configuration($wanted = null) {
     $defaults = [
+        'enabled' => false,
         'mechanics' => true,
         'keeplogs' => false,
         'usenice' => false,
@@ -260,6 +261,9 @@ function local_queue_configuration($wanted = null) {
     // Get defined configuration.
     $config = (array) get_config('local_queue');
     if (count($config) > 1) {
+        if (isset($config['local_queue_enabled'])) {
+            $defaults['enabled'] = $config['local_queue_enabled'];
+        }
         if (isset($config['local_queue_mechanics'])) {
             $defaults['mechanics'] = $config['local_queue_mechanics'];
         }

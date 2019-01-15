@@ -26,6 +26,8 @@
 $string['pluginname'] = 'Queue';
 $string['cronqueuerefresher'] = 'Cron Queue Refresher Task';
 // General settings.
+$string['enablequeue'] = 'Enable Cron Queue';
+$string['enablequeue_help'] = 'The queue will not function if this is unchecked. Enable it when the process is started. Otherwise use only for maintenance.';
 $string['generalsettings'] = 'General settings';
 $string['showmechanics'] = 'Show mechanics output';
 $string['showmechanics_help'] = 'Include system information about queue cycles in the logs?';

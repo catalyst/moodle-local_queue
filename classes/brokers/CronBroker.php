@@ -50,27 +50,18 @@ class CronBroker implements \local_queue\interfaces\QueueBroker{
         }
 
         $cronlockfactory = \core\lock\lock_config::get_lock_factory('cron');
-        if (!$cronlock = $cronlockfactory->get_lock('core_cron', 5)) {
-            QueueLogger::error('Cron is locked. Cannot continue.');
-        }
         $unique = $this->classname. '_'. $this->record->id;
         if ($lock = $cronlockfactory->get_lock($unique, 1)) {
             if (!$this->task) {
                 $lock->release();
             }
             $this->task->set_lock($lock);
-            if (!$this->task->is_blocking()) {
-                $cronlock->release();
-            } else {
-                $this->task->set_cron_lock($cronlock);
-            }
+            $this->task->set_cron_lock($lock);
             return $this->task;
         } else {
-            $cronlock->release();
             QueueLogger::error('Task is locked. Cannot continue.');
         }
 
-        $cronlock->release();
         return null;
     }
 }

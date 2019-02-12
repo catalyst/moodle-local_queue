@@ -231,7 +231,7 @@ class DefaultWorker implements \local_queue\interfaces\QueueWorker{
      * Trigger a "fake" error. Not caused by the task, but by the system, no attempt penalty needed.
      */
     public function trigger_error($error) {
-        file_put_contents($this->errorfile, $error, FILE_APPEND | LOCK_EX);
+        // file_put_contents($this->errorfile, $error, FILE_APPEND | LOCK_EX);
         $this->item->attempts++;
     }
 

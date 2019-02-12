@@ -28,6 +28,11 @@ require_once($CFG->dirroot.'/local/queue/lib.php');
 
 class QueueManager {
     /**
+     * Queue system enabled.
+     */
+    private $enabled;
+
+    /**
      * Maximum number of workers allowed.
      */
     private $maxworkers;
@@ -66,6 +71,7 @@ class QueueManager {
         $this->maxworkers = $defaults['pipesnumber'];
         $this->wait = $defaults['waittime'];
         $this->queueservice = $defaults['mainqueueservice'];
+        $this->enabled = $defaults['enabled'];
     }
 
     /**
@@ -119,8 +125,12 @@ class QueueManager {
         QueueLogger::systemlog(" ... Work started ... ", $color);
         QueueLogger::systemlog(" ... Loading configuration ... ", $color);
         $this->load_configuration();
-        if (!$this->queueing()) {
+        if ($this->enabled && !$this->queueing()) {
             QueueLogger::systemlog(" ... Queue cycle ended ... ", $color);
+        } else if (!$this->enabled) {
+            QueueLogger::systemlog(" ... The Queue is not enabled ... ", $color);
+            QueueLogger::systemlog(' ... Pausing work for '.($this->wait / 1000000).' second(s) ... ', $color);
+            usleep($this->wait);
         } else {
             QueueLogger::systemlog(' ... Pausing work for '.($this->wait / 1000000).' second(s) ... ', $color);
             usleep($this->wait);
@@ -148,7 +158,7 @@ class QueueManager {
         unset($color);
         gc_collect_cycles();
         gc_disable();
-        $maintenance = CLI_MAINTENANCE || moodle_needs_upgrading();
+        $maintenance = !$this->enabled || CLI_MAINTENANCE || moodle_needs_upgrading();
         if (!$maintenance && $slots > 0) {
             $service = $this->queueservice;
             $items = $service::consume($slots, $this->queue);

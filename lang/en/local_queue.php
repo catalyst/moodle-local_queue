@@ -26,6 +26,8 @@
 $string['pluginname'] = 'Queue';
 $string['cronqueuerefresher'] = 'Cron Queue Refresher Task';
 // General settings.
+$string['enablequeue'] = 'Enable Cron Queue';
+$string['enablequeue_help'] = 'The queue will not function if this is unchecked. Enable it when the process is started. Otherwise use only for maintenance.';
 $string['generalsettings'] = 'General settings';
 $string['showmechanics'] = 'Show mechanics output';
 $string['showmechanics_help'] = 'Include system information about queue cycles in the logs?';
@@ -72,3 +74,23 @@ $string['priority_help'] = 'Default queue item priority';
 $string['lowest'] = 'Lowest';
 $string['normal'] = 'Normal';
 $string['highest'] = 'Highest';
+// Cron activity.
+$string['cronactivity'] = 'Cron activity';
+$string['activity'] = 'Activity';
+$string['attemptsleft'] = 'Attempts left';
+$string['refresh'] = 'Refresh';
+$string['running'] = 'Running';
+$string['banned'] = 'Banned';
+$string['pending'] = 'Pending';
+$string['total'] = 'Total';
+$string['queueitems'] = 'Queue items';
+$string['timeadded'] = 'Time added';
+$string['timestarted'] = 'Time started';
+$string['timeinprogress'] = 'Been running for';
+// Blacklist.
+$string['blacklist'] = 'Blacklist';
+$string['timebanned'] = 'Time banned';
+$string['lastrun'] = 'Last run';
+$string['bannedqueueitems'] = 'Banned queue items';
+$string['noitemsfound'] = 'No items found';
+$string['itemremoved'] = 'Item removed';

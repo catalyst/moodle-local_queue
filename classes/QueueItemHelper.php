@@ -134,19 +134,24 @@ class QueueItemHelper {
      */
     public static function item_settings_data($classname, $queue) {
         $data = self::get_existing_settings($classname);
+        $type = local_queue_task_type_from_class($classname);
+        $adhoc = $type == 'adhoc_task';
         if (!$data) {
             $data = new \stdClass();
             $data->classname = $classname;
             $defaults = self::queue_item_defaults($queue);
+            $attempts = $adhoc ? 1 : $defaults['attempts'];
             $data->worker = $defaults['worker'];
             $data->broker = $defaults['broker'];
             $data->container = $defaults['container'];
             $data->job = $defaults['job'];
             $data->priority = $defaults['priority'];
-            $data->attempts = $defaults['attempts'];
+            $data->attempts = $attempts;
             $data->timecreated = time();
             $data->queue = $queue;
             $data->id = self::save_update_item_settings($data);
+        } else {
+            $data->attempts = $adhoc ? 1 : $data->attempts;
         }
         $data->special = $classname == QUEUE_REFRESHER_CLASS;
         return $data;

@@ -31,4 +31,14 @@ if ($hassiteconfig) {
         new lang_string('crontasks', 'local_queue'),
         new moodle_url('/local/queue/management/crontasks.php')
     ));
+    $ADMIN->add('local_queue_management', new admin_externalpage(
+        'local_queue_activity',
+        new lang_string('cronactivity', 'local_queue'),
+        new moodle_url('/local/queue/management/activity.php')
+    ));
+    $ADMIN->add('local_queue_management', new admin_externalpage(
+        'local_queue_blacklist',
+        new lang_string('blacklist', 'local_queue'),
+        new moodle_url('/local/queue/management/blacklist.php')
+    ));
 }

@@ -45,7 +45,7 @@ class DatabaseQueueService implements \local_queue\interfaces\QueueService {
         if ($queue) {
             $conditions['queue'] = $queue;
         }
-        $items = $DB->get_records(QUEUE_ITEMS_TABLE, $conditions, 'priority ASC, timecompleted ASC', '*', 0, $limit);
+        $items = $DB->get_records(QUEUE_ITEMS_TABLE, $conditions, 'priority ASC, timecreated ASC, timecompleted ASC', '*', 0, $limit);
         $ids = [];
         foreach ($items as $item) {
             array_push($ids, $item->id);

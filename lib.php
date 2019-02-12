@@ -248,6 +248,7 @@ function local_queue_rm_local_dir($dir) {
  */
 function local_queue_configuration($wanted = null) {
     $defaults = [
+        'enabled' => false,
         'mechanics' => true,
         'keeplogs' => false,
         'usenice' => false,
@@ -260,6 +261,9 @@ function local_queue_configuration($wanted = null) {
     // Get defined configuration.
     $config = (array) get_config('local_queue');
     if (count($config) > 1) {
+        if (isset($config['local_queue_enabled'])) {
+            $defaults['enabled'] = $config['local_queue_enabled'];
+        }
         if (isset($config['local_queue_mechanics'])) {
             $defaults['mechanics'] = $config['local_queue_mechanics'];
         }
@@ -350,6 +354,64 @@ function local_queue_items_settings($queue = 'cron') {
         }
     }
     return $settings;
+}
+
+
+/**
+ * Get list of queue items.
+ *
+ * @param string $queue the name of the queue to load items settings.
+ * @return array.
+ */
+function local_queue_items($queue = 'cron') {
+    global $DB;
+
+    $condition = ['queue' => $queue, 'banned' => false];
+    $items = $DB->get_records(QUEUE_ITEMS_TABLE, $condition, 'running DESC');
+    return $items;
+}
+
+/**
+ * Get list of banned queue items.
+ *
+ * @param string $queue the name of the queue to load items settings.
+ * @return array.
+ */
+function banned_queue_items($queue = 'cron') {
+    global $DB;
+
+    $condition = ['queue' => $queue, 'banned' => true];
+    $items = $DB->get_records(QUEUE_ITEMS_TABLE, $condition, 'timecompleted ASC');
+    return $items;
+}
+
+/**
+ * Get list of queue items statistics.
+ *
+ * @param string $queue the name of the queue to load items settings.
+ * @return array.
+ */
+function local_queue_items_stats($queue = 'cron') {
+    global $DB;
+
+    $condition = ['queue' => $queue];
+    $stats = [];
+    $stats[] = $DB->count_records(QUEUE_ITEMS_TABLE, $condition + ['running' => 1]);
+    $stats[] = $DB->count_records(QUEUE_ITEMS_TABLE, $condition + ['running' => 0, 'banned' => 0]);
+    $stats[] = $DB->count_records(QUEUE_ITEMS_TABLE, $condition + ['banned' => 1]);
+    return $stats;
+}
+
+/**
+ *Remove a queue item.
+ *
+ * @param integer $itemid the ID of the queue item.
+ * @return array.
+ */
+function local_queue_remove_item($itemid) {
+    global $DB;
+    $params = array('id' => $itemid);
+    return $DB->delete_records(QUEUE_ITEMS_TABLE, $params);
 }
 
 /**
